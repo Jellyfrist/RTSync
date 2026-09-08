@@ -216,3 +216,57 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ============================================
+# RTSync project-specific ignores
+# ============================================
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# Node / Vue / Vite
+node_modules/
+**/node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*client_secret*.json
+
+# Python virtual environments / caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# IDE / editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs / temporary files
+*.log
+*.tmp
+*.temp
+.DS_Store?
+
+# OS / local tooling
+Thumbs.db

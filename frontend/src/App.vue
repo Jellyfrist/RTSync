@@ -1,0 +1,8 @@
+<script setup>
+import { RouterView } from 'vue-router'
+</script>
+
+<template>
+  <!-- Root component สำหรับแสดงหน้าตาม route ปัจจุบัน -->
+  <RouterView />
+</template>
