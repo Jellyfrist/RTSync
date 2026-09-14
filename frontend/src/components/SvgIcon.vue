@@ -21,6 +21,7 @@ defineProps({
     <template v-else-if="name === 'download'"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></template>
     <template v-else-if="name === 'user'"><circle cx="12" cy="8" r="3"/><path d="M5 21a7 7 0 0 1 14 0"/></template>
     <template v-else-if="name === 'edit'"><path d="m4 16-.8 4.8L8 20l11-11-4-4Z"/><path d="m13 6 4 4"/></template>
+    <template v-else-if="name === 'check'"><path d="m5 12 4 4L19 6"/></template>
     <template v-else><circle cx="12" cy="12" r="8"/></template>
   </svg>
 </template>

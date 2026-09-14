@@ -6,7 +6,7 @@ const items = [
   { to: '/customers', label: 'ใบเสนอราคา & ลูกค้า', icon: 'quote' },
   { to: '/inventory', label: 'สินค้า & คลังอุปกรณ์', icon: 'box' },
   { to: '/suppliers', label: 'ซัพพลายเออร์ & สั่งซื้อ', icon: 'truck' },
-  { to: '/installations', label: 'คิวติดตั้งโซล่าเซลล์', icon: 'solar' },
+  { to: '/installations', label: 'ขาย · ติดตั้ง · บริการ', icon: 'solar' },
   { to: '/payroll', label: 'ค่าตอบแทน & OT พนักงาน', icon: 'wallet' }
 ]
 </script>

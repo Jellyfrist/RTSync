@@ -1,137 +1,55 @@
 <script setup>
-import { ref, computed } from "vue";
-import AppShell from "@/components/AppShell.vue";
-import SvgIcon from "@/components/SvgIcon.vue";
-import { useSearch } from "@/composables/useSearch";
+import { computed, ref } from 'vue'
+import AppShell from '@/components/AppShell.vue'
+import SvgIcon from '@/components/SvgIcon.vue'
+import { useSearch } from '@/composables/useSearch'
+
+const activeTab = ref('products')
+const category = ref('ทั้งหมด')
+const showModal = ref(false)
+const editingProduct = ref(null)
+const toast = ref('')
 const products = ref([
-  {
-    sku: "SP-JA-550M",
-    name: "แผงโซลาร์ JA Solar 550W",
-    category: "แผงโซลาร์",
-    stock: 140,
-    price: "฿4,150",
-  },
-  {
-    sku: "INV-HW-5K1P",
-    name: "Huawei SUN2000-5KTL",
-    category: "อินเวอร์เตอร์",
-    stock: 12,
-    price: "฿42,900",
-  },
-  {
-    sku: "INV-HW-10K3P",
-    name: "Huawei SUN2000-10KTL-M1",
-    category: "อินเวอร์เตอร์",
-    stock: 6,
-    price: "฿58,900",
-  },
-  {
-    sku: "SP-LN-585X",
-    name: "Longi Hi-MO 6 585W",
-    category: "แผงโซลาร์",
-    stock: 84,
-    price: "฿4,350",
-  },
-  {
-    sku: "SEN-HW-DTSU",
-    name: "Huawei Smart Power Sensor",
-    category: "อุปกรณ์วัด",
-    stock: 24,
-    price: "฿5,200",
-  },
-]);
-const { query, filteredItems } = useSearch(products, [
-  "sku",
-  "name",
-  "category",
-]);
-const category = ref("ทั้งหมด");
-const filteredProducts = computed(() =>
-  category.value === "ทั้งหมด"
-    ? filteredItems.value
-    : filteredItems.value.filter((item) => item.category === category.value),
-);
+  { sku: 'SP-JA-550M', name: 'แผงโซลาร์ JA Solar 550W', category: 'แผงโซลาร์', stock: 140, reorderPoint: 40, unit: 'แผง', price: 4150, supplier: 'JA Solar Thailand', status: 'พร้อมจำหน่าย' },
+  { sku: 'INV-HW-5K1P', name: 'Huawei SUN2000-5KTL', category: 'อินเวอร์เตอร์', stock: 12, reorderPoint: 15, unit: 'เครื่อง', price: 42900, supplier: 'Huawei Solar', status: 'ต้องสั่งเพิ่ม' },
+  { sku: 'INV-HW-10K3P', name: 'Huawei SUN2000-10KTL-M1', category: 'อินเวอร์เตอร์', stock: 6, reorderPoint: 10, unit: 'เครื่อง', price: 58900, supplier: 'Huawei Solar', status: 'ต้องสั่งเพิ่ม' },
+  { sku: 'SP-LN-585X', name: 'Longi Hi-MO 6 585W', category: 'แผงโซลาร์', stock: 84, reorderPoint: 35, unit: 'แผง', price: 4350, supplier: 'LONGi Thailand', status: 'พร้อมจำหน่าย' },
+  { sku: 'SEN-HW-DTSU', name: 'Huawei Smart Power Sensor', category: 'อุปกรณ์วัด', stock: 24, reorderPoint: 12, unit: 'ชิ้น', price: 5200, supplier: 'Huawei Solar', status: 'พร้อมจำหน่าย' },
+  { sku: 'CB-DC-6MM', name: 'สายไฟโซลาร์ DC 6mm สีดำ', category: 'อุปกรณ์ติดตั้ง', stock: 210, reorderPoint: 100, unit: 'ม้วน', price: 1850, supplier: 'Solar Cable Co.', status: 'พร้อมจำหน่าย' },
+])
+const form = ref({ sku: '', name: '', category: 'แผงโซลาร์', stock: 0, reorderPoint: 10, unit: 'ชิ้น', price: 0, supplier: '' })
+const { query, filteredItems } = useSearch(products, ['sku', 'name', 'category'])
+const categories = ['ทั้งหมด', 'แผงโซลาร์', 'อินเวอร์เตอร์', 'อุปกรณ์วัด', 'อุปกรณ์ติดตั้ง']
+const filteredProducts = computed(() => category.value === 'ทั้งหมด' ? filteredItems.value : filteredItems.value.filter(item => item.category === category.value))
+const lowStock = computed(() => products.value.filter(item => item.stock <= item.reorderPoint))
+const inventoryValue = computed(() => products.value.reduce((sum, item) => sum + item.stock * item.price, 0))
+const formattedMoney = value => `฿${Number(value).toLocaleString('th-TH')}`
+const availableCount = computed(() => products.value.filter(item => item.stock > 0).length)
+function resetForm() { form.value = { sku: '', name: '', category: 'แผงโซลาร์', stock: 0, reorderPoint: 10, unit: 'ชิ้น', price: 0, supplier: '' }; editingProduct.value = null }
+function openAdd() { resetForm(); showModal.value = true }
+function openEdit(product) { form.value = { ...product }; editingProduct.value = product; showModal.value = true }
+function saveProduct() {
+  if (!form.value.sku || !form.value.name) return
+  const next = { ...form.value, stock: Number(form.value.stock), reorderPoint: Number(form.value.reorderPoint), price: Number(form.value.price), status: Number(form.value.stock) <= Number(form.value.reorderPoint) ? 'ต้องสั่งเพิ่ม' : 'พร้อมจำหน่าย' }
+  if (editingProduct.value) Object.assign(editingProduct.value, next); else products.value.unshift(next)
+  showModal.value = false; toast.value = editingProduct.value ? 'บันทึกการแก้ไขสินค้าแล้ว' : 'ลงทะเบียนสินค้าใหม่แล้ว'; setTimeout(() => { toast.value = '' }, 2600)
+}
+function receiveStock(product) {
+  const amount = Number(window.prompt(`เติมสินค้า ${product.name}\nระบุจำนวน ${product.unit} ที่รับเข้า`, '10'))
+  if (!Number.isNaN(amount) && amount > 0) { product.stock += amount; product.status = product.stock <= product.reorderPoint ? 'ต้องสั่งเพิ่ม' : 'พร้อมจำหน่าย'; toast.value = `เติม Stock ${product.sku} จำนวน ${amount} ${product.unit} แล้ว`; setTimeout(() => { toast.value = '' }, 2600) }
+}
+function createPurchaseRequest(product) { toast.value = `สร้างรายการสั่งซื้อ ${product.sku} แล้ว`; setTimeout(() => { toast.value = '' }, 2600) }
 </script>
+
 <template>
-  <AppShell placeholder="ค้นหา SKU, รหัสสินค้า, ชื่อสินค้า..."
-    ><div class="page-title">
-      <div>
-        <h1>สินค้าและคลังอุปกรณ์</h1>
-        <p>Product Inventory Management</p>
-      </div>
-      <button class="button primary"><SvgIcon name="plus" />เพิ่มสินค้า</button>
-    </div>
-    <section class="kpi-grid">
-      <article class="kpi-card">
-        <div>
-          <span>สินค้าทั้งหมด</span><strong>148 <small>รายการ</small></strong
-          ><em>พร้อมจำหน่าย 142 รายการ</em>
-        </div>
-        <SvgIcon name="box" size="26" />
-      </article>
-      <article class="kpi-card">
-        <div>
-          <span>มูลค่าสินค้าคงคลัง</span><strong>฿2.84M</strong
-          ><em>อัปเดตล่าสุดวันนี้</em>
-        </div>
-        <SvgIcon name="wallet" size="26" />
-      </article>
-    </section>
-    <section class="panel">
-      <div class="panel-toolbar">
-        <div class="filter-tabs">
-          <button
-            v-for="item in [
-              'ทั้งหมด',
-              'แผงโซลาร์',
-              'อินเวอร์เตอร์',
-              'อุปกรณ์วัด',
-            ]"
-            :key="item"
-            :class="{ selected: category === item }"
-            @click="category = item"
-          >
-            {{ item }}
-          </button>
-        </div>
-        <div class="search-inline">
-          <SvgIcon name="search" /><input
-            v-model="query"
-            placeholder="ค้นหาในตาราง"
-          />
-        </div>
-      </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>SKU</th>
-            <th>สินค้า</th>
-            <th>หมวดหมู่</th>
-            <th>คงเหลือ</th>
-            <th>ราคา</th>
-            <th>จัดการ</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="product in filteredProducts" :key="product.sku">
-            <td class="mono">{{ product.sku }}</td>
-            <td>
-              <strong>{{ product.name }}</strong>
-            </td>
-            <td>{{ product.category }}</td>
-            <td>
-              <span :class="product.stock < 10 ? 'warning-tag' : 'success-tag'"
-                >{{ product.stock }} รายการ</span
-              >
-            </td>
-            <td class="mono">{{ product.price }}</td>
-            <td>
-              <button class="icon-button" title="แก้ไข">
-                <SvgIcon name="edit" />
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table></section
-  ></AppShell>
+  <AppShell placeholder="ค้นหา SKU, รหัสสินค้า, ชื่อสินค้า...">
+    <div class="page-title inventory-heading"><div><span class="eyebrow">INVENTORY CONTROL CENTER</span><h1>จัดการข้อมูลสินค้า</h1><p>ลงทะเบียนสินค้า ติดตาม Stock และวางแผน Reorder Point ในที่เดียว</p></div><div class="button-row"><button class="button secondary" @click="activeTab = 'stock'"><SvgIcon name="download" />รายงาน Stock</button><button class="button primary" @click="openAdd"><SvgIcon name="plus" />ลงทะเบียนสินค้า</button></div></div>
+    <section class="inventory-kpis"><article class="inventory-kpi"><div class="kpi-icon blue"><SvgIcon name="box" size="20" /></div><div><span>สินค้าทั้งหมด</span><strong>{{ products.length }} <small>รายการ</small></strong><em>{{ availableCount }} รายการมี Stock</em></div></article><article class="inventory-kpi"><div class="kpi-icon green"><SvgIcon name="wallet" size="20" /></div><div><span>มูลค่าคงคลัง</span><strong>{{ formattedMoney(inventoryValue) }}</strong><em>อัปเดตล่าสุดวันนี้ 09:42</em></div></article><article class="inventory-kpi alert"><div class="kpi-icon orange"><SvgIcon name="settings" size="20" /></div><div><span>รายการถึง Reorder Point</span><strong>{{ lowStock.length }} <small>รายการ</small></strong><em>ควรตรวจสอบภายในวันนี้</em></div></article></section>
+    <nav class="inventory-tabs" aria-label="เมนูจัดการข้อมูลสินค้า"><button :class="{ active: activeTab === 'products' }" @click="activeTab = 'products'"><SvgIcon name="box" />ทะเบียนสินค้า <span>{{ products.length }}</span></button><button :class="{ active: activeTab === 'stock' }" @click="activeTab = 'stock'"><SvgIcon name="download" />รายงาน Stock</button><button :class="{ active: activeTab === 'reorder' }" @click="activeTab = 'reorder'"><SvgIcon name="settings" />Reorder Point <span class="tab-alert">{{ lowStock.length }}</span></button></nav>
+    <section v-if="activeTab === 'products'" class="panel inventory-panel"><div class="panel-toolbar"><div><h2 class="section-heading">ทะเบียนสินค้า</h2><p class="section-caption">รายการสินค้าและอุปกรณ์ที่อยู่ในระบบคลัง</p></div><div class="inventory-toolbar"><div class="filter-tabs"><button v-for="item in categories" :key="item" :class="{ selected: category === item }" @click="category = item">{{ item }}</button></div><div class="search-inline"><SvgIcon name="search" /><input v-model="query" placeholder="ค้นหาในตาราง" /></div></div></div><div class="table-scroll"><table class="data-table inventory-table"><thead><tr><th>SKU / รหัสสินค้า</th><th>สินค้า</th><th>หมวดหมู่</th><th>คงเหลือ</th><th>Reorder Point</th><th>มูลค่า</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody><tr v-for="product in filteredProducts" :key="product.sku"><td><span class="sku-code">{{ product.sku }}</span></td><td><strong>{{ product.name }}</strong><small class="table-subtext">{{ product.supplier }}</small></td><td>{{ product.category }}</td><td><strong>{{ product.stock.toLocaleString() }}</strong> {{ product.unit }}</td><td>{{ product.reorderPoint }} {{ product.unit }}</td><td class="mono">{{ formattedMoney(product.stock * product.price) }}</td><td><span :class="product.stock <= product.reorderPoint ? 'warning-tag' : 'success-tag'">{{ product.status }}</span></td><td><div class="table-actions"><button class="icon-button" title="เติมสินค้า" @click="receiveStock(product)"><SvgIcon name="plus" /></button><button class="icon-button" title="แก้ไข" @click="openEdit(product)"><SvgIcon name="edit" /></button></div></td></tr><tr v-if="!filteredProducts.length"><td colspan="8" class="empty-state">ไม่พบรายการสินค้าที่ค้นหา</td></tr></tbody></table></div></section>
+    <section v-else-if="activeTab === 'stock'" class="stock-report-layout"><article class="panel stock-overview"><div class="panel-toolbar"><div><h2 class="section-heading">รายงาน Stock สินค้า</h2><p class="section-caption">ภาพรวมระดับคงคลังแยกตามหมวดหมู่</p></div><button class="button secondary"><SvgIcon name="download" />ส่งออกรายงาน</button></div><div class="stock-bars"><div v-for="item in categories.slice(1)" :key="item" class="stock-bar-row"><div class="bar-label"><span>{{ item }}</span><strong>{{ products.filter(p => p.category === item).reduce((s, p) => s + p.stock, 0).toLocaleString() }}</strong></div><div class="bar-track"><span :style="{ width: `${Math.min(100, products.filter(p => p.category === item).reduce((s, p) => s + p.stock, 0) / 3)}%` }"></span></div></div></div></article><article class="panel movement-card"><span class="eyebrow">MOVEMENT THIS MONTH</span><strong>+286 <small>หน่วย</small></strong><p>รับเข้า 342 หน่วย · เบิกออก 56 หน่วย</p><div class="movement-line"><span style="height: 38%"></span><span style="height: 52%"></span><span style="height: 46%"></span><span style="height: 74%"></span><span style="height: 62%"></span><span style="height: 89%"></span><span style="height: 80%"></span></div><small>สัปดาห์ 1&nbsp;&nbsp;&nbsp; สัปดาห์ 2&nbsp;&nbsp;&nbsp; สัปดาห์ 3&nbsp;&nbsp;&nbsp; สัปดาห์ 4</small></article></section>
+    <section v-else class="panel reorder-panel"><div class="panel-toolbar"><div><h2 class="section-heading">Reorder Point</h2><p class="section-caption">รายการที่ Stock ต่ำกว่าจุดสั่งซื้อที่ตั้งไว้</p></div><span class="warning-summary"><SvgIcon name="settings" /> {{ lowStock.length }} รายการต้องดำเนินการ</span></div><div class="reorder-grid"><article v-for="product in lowStock" :key="product.sku" class="reorder-card"><div class="reorder-card-head"><span class="sku-code">{{ product.sku }}</span><span class="warning-tag">ต่ำกว่าจุดสั่งซื้อ</span></div><h3>{{ product.name }}</h3><div class="stock-meter"><div><span>Stock ปัจจุบัน <strong>{{ product.stock }} {{ product.unit }}</strong></span><span>จุดสั่งซื้อ <strong>{{ product.reorderPoint }} {{ product.unit }}</strong></span></div><div class="meter-track"><span :style="{ width: `${Math.min(100, product.stock / product.reorderPoint * 100)}%` }"></span></div></div><button class="button primary full" @click="createPurchaseRequest(product)">สร้างรายการสั่งซื้อ</button></article><div v-if="!lowStock.length" class="empty-state">ไม่มีสินค้าที่ต้องสั่งเพิ่มในขณะนี้</div></div></section>
+    <div v-if="toast" class="toast"><SvgIcon name="check" />{{ toast }}</div>
+    <div v-if="showModal" class="modal-backdrop" @click.self="showModal = false"><form class="modal product-modal" @submit.prevent="saveProduct"><div class="modal-heading"><div><span class="eyebrow">PRODUCT REGISTRATION</span><h2>{{ editingProduct ? 'แก้ไขข้อมูลสินค้า' : 'ลงทะเบียนสินค้าใหม่' }}</h2></div><button type="button" class="icon-button" title="ปิด" @click="showModal = false"><SvgIcon name="close" /></button></div><div class="form-grid"><label>SKU / รหัสสินค้า<input v-model="form.sku" required placeholder="เช่น INV-HW-5K1P" /></label><label>ชื่อสินค้า<input v-model="form.name" required placeholder="ชื่อสินค้าและรุ่น" /></label><label>หมวดหมู่<select v-model="form.category"><option v-for="item in categories.slice(1)" :key="item">{{ item }}</option></select></label><label>หน่วยนับ<input v-model="form.unit" placeholder="ชิ้น / แผง / เครื่อง" /></label><label>จำนวน Stock เริ่มต้น<input v-model="form.stock" type="number" min="0" /></label><label>Reorder Point<input v-model="form.reorderPoint" type="number" min="0" /></label><label>ราคาต่อหน่วย<input v-model="form.price" type="number" min="0" /></label><label>ซัพพลายเออร์<input v-model="form.supplier" placeholder="ชื่อผู้จัดจำหน่าย" /></label></div><div class="button-row end"><button type="button" class="button secondary" @click="showModal = false">ยกเลิก</button><button type="submit" class="button primary">บันทึกข้อมูลสินค้า</button></div></form></div>
+  </AppShell>
 </template>
