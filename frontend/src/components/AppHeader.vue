@@ -3,7 +3,11 @@
 import { ref } from "vue";
 import SvgIcon from "./SvgIcon.vue";
 
-defineProps({ placeholder: { type: String, default: "ค้นหาข้อมูลในระบบ..." } });
+const props = defineProps({
+  placeholder: { type: String, default: "ค้นหาข้อมูลในระบบ..." },
+  sidebarCollapsed: { type: Boolean, default: false },
+});
+const emit = defineEmits(["toggle-sidebar"]);
 const query = ref("");
 const showNotifications = ref(false);
 const notifications = [
@@ -31,6 +35,15 @@ const notifications = [
 <template>
   <!-- Header กลางพร้อมช่องค้นหาและสถานะระบบ -->
   <header class="app-header">
+    <button
+      class="icon-button sidebar-toggle header-sidebar-toggle"
+      type="button"
+      :aria-label="props.sidebarCollapsed ? 'ขยายเมนูด้านข้าง' : 'ยุบเมนูด้านข้าง'"
+      :title="props.sidebarCollapsed ? 'ขยายเมนูด้านข้าง' : 'ยุบเมนูด้านข้าง'"
+      @click="emit('toggle-sidebar')"
+    >
+      <SvgIcon :name="props.sidebarCollapsed ? 'chevron-right' : 'chevron-left'" />
+    </button>
     <div class="header-search">
       <SvgIcon name="search" /><input
         v-model="query"
