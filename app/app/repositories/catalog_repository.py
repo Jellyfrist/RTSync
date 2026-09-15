@@ -1,3 +1,5 @@
+"""แหล่งข้อมูลแค็ตตาล็อกเดิมสำหรับ API ที่เข้ากันได้ย้อนหลัง"""
+
 from app.schemas.catalog import CatalogSummary
 from app.schemas.product import Product
 

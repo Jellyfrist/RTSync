@@ -1,1 +1,5 @@
-"""Domain models จะถูกเพิ่มในชั้น persistence เมื่อเชื่อมฐานข้อมูลจริง."""
+"""โมเดลฐานข้อมูลของระบบ RT Sync"""
+
+from app.models.inventory import Product, ReorderAlert, StockMovement
+
+__all__ = ["Product", "ReorderAlert", "StockMovement"]

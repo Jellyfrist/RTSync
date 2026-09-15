@@ -1,5 +1,6 @@
+<!-- โครงหลักของแอปที่เป็นจุดแสดงหน้าตามเส้นทาง -->
 <script setup>
-import { RouterView } from 'vue-router'
+import { RouterView } from "vue-router";
 </script>
 
 <template>

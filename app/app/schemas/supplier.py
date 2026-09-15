@@ -1,3 +1,5 @@
+"""รูปแบบข้อมูลซัพพลายเออร์"""
+
 from pydantic import BaseModel
 
 
@@ -7,5 +9,6 @@ class Supplier(BaseModel):
     id: str
     name: str
     category: str
+    description: str = ""
     delivery: str
     sku_count: int

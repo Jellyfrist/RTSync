@@ -5,7 +5,7 @@
 ## Run locally
 
 ```bash
-cd backend
+cd app
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -24,4 +24,4 @@ uvicorn app.main:app --reload --port 8000
 - `GET /api/suppliers` สำหรับรายการซัพพลายเออร์ mock
 - `GET /api/employees` สำหรับรายการพนักงาน mock
 
-ข้อมูลปัจจุบันเก็บใน memory เพื่อเป็นโครงสร้างเริ่มต้น สามารถเปลี่ยน repository เป็น PostgreSQL/SQLAlchemy ได้ภายหลังโดยไม่ต้องย้าย router หรือ schema
+ข้อมูล inventory ใช้ SQLite ในโฟลเดอร์ `app/data` และ seed อัตโนมัติเมื่อเริ่มระบบ สามารถเปลี่ยน `DATABASE_URL` ใน `.env` เป็น PostgreSQL ได้ โดยยังคงแยก router → service → repository → model/schema เหมือนเดิม

@@ -1,3 +1,5 @@
+"""ชั้นบริการแค็ตตาล็อกที่คงไว้เพื่อรองรับ API เดิม"""
+
 from app.repositories.catalog_repository import get_catalog_summary, list_products
 
 

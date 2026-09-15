@@ -1,3 +1,5 @@
+"""เส้นทาง API รายชื่อลูกค้า"""
+
 from fastapi import APIRouter
 
 from app.repositories.customer_repository import list_customers
@@ -8,6 +10,7 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 
 @router.get("", response_model=list[Customer])
 def get_customers() -> list[Customer]:
+    """ส่งรายการลูกค้าให้หน้า directory"""
     """ส่งรายการลูกค้าให้ customer directory"""
 
     return list_customers()

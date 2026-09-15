@@ -1,3 +1,5 @@
+"""เส้นทางตรวจสอบสถานะการทำงานของ backend"""
+
 from fastapi import APIRouter
 
 router = APIRouter(tags=["health"])

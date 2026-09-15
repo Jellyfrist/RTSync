@@ -1,3 +1,5 @@
+"""เส้นทาง API แค็ตตาล็อกเดิม"""
+
 from fastapi import APIRouter
 
 from app.schemas.catalog import CatalogSummary

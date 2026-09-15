@@ -1,4 +1,6 @@
-// จุดรวม API ของ catalog; ตอนนี้ใช้ข้อมูล mock เดิมจากหน้า prototype
+// ไฟล์เชื่อมต่อข้อมูลสรุปแค็ตตาล็อก โดยใช้ API คลังเป็นแหล่งข้อมูลเดียว
+import { inventoryApi } from "./inventoryApi";
+
 export async function getCatalogSummary() {
-  return { totalProducts: 148, availableItems: 1420 }
+  return inventoryApi.getSummary();
 }

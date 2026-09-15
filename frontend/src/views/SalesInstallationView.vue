@@ -1,48 +1,482 @@
 <script setup>
-import { computed, ref } from 'vue'
-import AppShell from '@/components/AppShell.vue'
-import SvgIcon from '@/components/SvgIcon.vue'
+// ไฟล์นี้จัดการใบเสนอราคา นัดหมายติดตั้ง และงานบริการหลังการขาย
+import { computed, onMounted, ref } from "vue";
+import AppShell from "@/components/AppShell.vue";
+import SvgIcon from "@/components/SvgIcon.vue";
+import { operationsApi } from "@/api/operationsApi";
 
-const activeTab = ref('sales')
-const toast = ref('')
-const showAppointmentForm = ref(false)
-const newAppointment = ref({ customer: 'คุณสมศักดิ์ วัฒนากุล', date: '', time: '09:00–12:00', crew: 'ทีมช่าง A', type: 'ติดตั้งระบบ' })
-const catalog = [
-  { sku: 'SP-LN-550', name: 'แผงโซลาร์ Longi 550W', price: 4150, stock: 18, unit: 'แผง' },
-  { sku: 'INV-HW-10K', name: 'Inverter Huawei 10kW 3P', price: 58900, stock: 6, unit: 'เครื่อง' },
-  { sku: 'BAT-BYD-10', name: 'แบตเตอรี่ BYD 10.2kWh', price: 165000, stock: 3, unit: 'ชุด' },
-]
-const bill = ref([])
-const appointments = ref([
-  { id: 'INS-250615', customer: 'คุณสมศักดิ์ วัฒนากุล', site: 'บางพลี สมุทรปราการ', date: '18 มิ.ย. 2025', time: '09:00–12:00', crew: 'ทีมช่าง A', status: 'ยืนยันแล้ว', type: 'ติดตั้งระบบ 10 kWp' },
-  { id: 'INS-250617', customer: 'บริษัท พลังงานไทย จำกัด', site: 'บางปะอิน อยุธยา', date: '20 มิ.ย. 2025', time: '13:00–16:00', crew: 'ทีมช่าง B', status: 'รอยืนยัน', type: 'ตรวจหน้างานก่อนติดตั้ง' },
-  { id: 'INS-250620', customer: 'บจก. ธนทรัพย์ โลจิสติกส์', site: 'ลาดกระบัง กทม.', date: '23 มิ.ย. 2025', time: '09:00–15:00', crew: 'ทีมช่าง C', status: 'เตรียมอุปกรณ์', type: 'ติดตั้งระบบ 120 kWp' },
-])
-const serviceTickets = ref([
-  { id: 'SRV-25042', customer: 'คุณกมลชนก สุขใจ', subject: 'Monitoring ไม่ส่งข้อมูล', opened: '16 มิ.ย. 2025', priority: 'สูง', status: 'กำลังดำเนินการ', owner: 'ช่างณัฐพล' },
-  { id: 'SRV-25039', customer: 'คุณสมศักดิ์ วัฒนากุล', subject: 'ตรวจเช็กประจำปี', opened: '12 มิ.ย. 2025', priority: 'ปกติ', status: 'เสร็จสิ้น', owner: 'ทีมช่าง A' },
-])
-const newTicket = ref({ customer: 'คุณสมศักดิ์ วัฒนากุล', subject: '', priority: 'ปกติ' })
-const total = computed(() => bill.value.reduce((sum, item) => sum + item.price * item.qty, 0))
-const formatCurrency = value => new Intl.NumberFormat('th-TH').format(value)
-const notify = message => { toast.value = message; setTimeout(() => { toast.value = '' }, 2600) }
-function addToBill(product) { const item = bill.value.find(row => row.sku === product.sku); if (item) item.qty += 1; else bill.value.push({ ...product, qty: 1 }); notify(`เพิ่ม ${product.name} ลงใบเสนอราคาแล้ว`) }
-function removeItem(index) { bill.value.splice(index, 1) }
-function saveSale() { if (!bill.value.length) return notify('กรุณาเลือกสินค้าอย่างน้อย 1 รายการ'); notify('บันทึกคำสั่งขายแล้ว — พร้อมสร้างนัดหมายติดตั้ง') }
-function cycleAppointment(item) { const flow = ['รอยืนยัน', 'ยืนยันแล้ว', 'เตรียมอุปกรณ์', 'กำลังติดตั้ง', 'เสร็จสิ้น']; const next = flow[(flow.indexOf(item.status) + 1) % flow.length]; item.status = next; notify(`${item.id} เปลี่ยนสถานะเป็น ${next}`) }
-function createTicket() { if (!newTicket.value.subject.trim()) return notify('กรุณาระบุหัวข้อปัญหา'); serviceTickets.value.unshift({ id: `SRV-250${43 + serviceTickets.value.length}`, customer: newTicket.value.customer, subject: newTicket.value.subject, opened: 'วันนี้', priority: newTicket.value.priority, status: 'รับเรื่องใหม่', owner: 'รอมอบหมาย' }); newTicket.value.subject = ''; notify('เปิดใบงานบริการหลังการขายแล้ว') }
-function closeTicket(ticket) { ticket.status = 'เสร็จสิ้น'; notify(`${ticket.id} ปิดงานเรียบร้อย`) }
-function createAppointment() { if (!newAppointment.value.date) return notify('กรุณาเลือกวันที่นัดหมาย'); appointments.value.push({ id: `INS-25062${appointments.value.length}`, customer: newAppointment.value.customer, site: 'รอระบุสถานที่', date: newAppointment.value.date, time: newAppointment.value.time, crew: newAppointment.value.crew, status: 'รอยืนยัน', type: newAppointment.value.type }); showAppointmentForm.value = false; newAppointment.value.date = ''; notify('สร้างนัดหมายใหม่แล้ว') }
+const activeTab = ref("sales");
+const toast = ref("");
+const showAppointmentForm = ref(false);
+const newAppointment = ref({
+  customer: "คุณสมศักดิ์ วัฒนากุล",
+  date: "",
+  time: "09:00–12:00",
+  crew: "ทีมช่าง A",
+  type: "ติดตั้งระบบ",
+});
+// สินค้าแนะนำที่โหลดจาก API งานปฏิบัติการ
+const catalog = [];
+const bill = ref([]);
+// นัดหมายและใบงานที่โหลดจาก backend
+const appointments = ref([]);
+const serviceTickets = ref([]);
+const newTicket = ref({
+  customer: "คุณสมศักดิ์ วัฒนากุล",
+  subject: "",
+  priority: "ปกติ",
+});
+onMounted(async () => {
+  // โหลดสินค้า นัดหมาย และใบงานพร้อมกันเมื่อเปิดหน้า
+  const [catalogRecords, appointmentRecords, ticketRecords] = await Promise.all(
+    [
+      operationsApi.getCatalog(),
+      operationsApi.getAppointments(),
+      operationsApi.getServiceTickets(),
+    ],
+  );
+  catalog.splice(0, catalog.length, ...catalogRecords);
+  appointments.value = appointmentRecords;
+  serviceTickets.value = ticketRecords;
+});
+const total = computed(() =>
+  bill.value.reduce((sum, item) => sum + item.price * item.qty, 0),
+);
+const formatCurrency = (value) => new Intl.NumberFormat("th-TH").format(value);
+const notify = (message) => {
+  toast.value = message;
+  setTimeout(() => {
+    toast.value = "";
+  }, 2600);
+};
+function addToBill(product) {
+  // เพิ่มสินค้าเข้าใบเสนอราคา
+  const item = bill.value.find((row) => row.sku === product.sku);
+  if (item) item.qty += 1;
+  else bill.value.push({ ...product, qty: 1 });
+  notify(`เพิ่ม ${product.name} ลงใบเสนอราคาแล้ว`);
+}
+function removeItem(index) {
+  bill.value.splice(index, 1);
+}
+function saveSale() {
+  if (!bill.value.length) return notify("กรุณาเลือกสินค้าอย่างน้อย 1 รายการ");
+  notify("บันทึกคำสั่งขายแล้ว — พร้อมสร้างนัดหมายติดตั้ง");
+}
+function cycleAppointment(item) {
+  // เลื่อนสถานะนัดหมายไปขั้นถัดไป
+  const flow = [
+    "รอยืนยัน",
+    "ยืนยันแล้ว",
+    "เตรียมอุปกรณ์",
+    "กำลังติดตั้ง",
+    "เสร็จสิ้น",
+  ];
+  const next = flow[(flow.indexOf(item.status) + 1) % flow.length];
+  item.status = next;
+  notify(`${item.id} เปลี่ยนสถานะเป็น ${next}`);
+}
+function createTicket() {
+  if (!newTicket.value.subject.trim()) return notify("กรุณาระบุหัวข้อปัญหา");
+  serviceTickets.value.unshift({
+    id: `SRV-250${43 + serviceTickets.value.length}`,
+    customer: newTicket.value.customer,
+    subject: newTicket.value.subject,
+    opened: "วันนี้",
+    priority: newTicket.value.priority,
+    status: "รับเรื่องใหม่",
+    owner: "รอมอบหมาย",
+  });
+  newTicket.value.subject = "";
+  notify("เปิดใบงานบริการหลังการขายแล้ว");
+}
+function closeTicket(ticket) {
+  ticket.status = "เสร็จสิ้น";
+  notify(`${ticket.id} ปิดงานเรียบร้อย`);
+}
+function createAppointment() {
+  if (!newAppointment.value.date) return notify("กรุณาเลือกวันที่นัดหมาย");
+  appointments.value.push({
+    id: `INS-25062${appointments.value.length}`,
+    customer: newAppointment.value.customer,
+    site: "รอระบุสถานที่",
+    date: newAppointment.value.date,
+    time: newAppointment.value.time,
+    crew: newAppointment.value.crew,
+    status: "รอยืนยัน",
+    type: newAppointment.value.type,
+  });
+  showAppointmentForm.value = false;
+  newAppointment.value.date = "";
+  notify("สร้างนัดหมายใหม่แล้ว");
+}
 </script>
 
 <template>
   <AppShell placeholder="ค้นหา SKU, รหัสสินค้า, ชื่อลูกค้า...">
-    <div class="page-title"><div><span class="eyebrow">CUSTOMER OPERATIONS</span><h1>ขายสินค้า · ติดตั้ง · บริการหลังการขาย</h1><p>จัดการตั้งแต่ใบเสนอราคาไปจนถึงงานบริการในหน้าปฏิบัติการเดียว</p></div><span class="online-status">ระบบออนไลน์ (ONLINE)</span></div>
-    <section class="kpi-grid four"><article class="kpi-card"><div><span>คำสั่งขายเดือนนี้</span><strong>24 <small>รายการ</small></strong><em>ยอดขาย ฿1.84M</em></div><SvgIcon name="quote" /></article><article class="kpi-card"><div><span>นัดหมายติดตั้ง</span><strong>8 <small>ไซต์งาน</small></strong><em>สัปดาห์นี้ · 2 รอยืนยัน</em></div><SvgIcon name="solar" /></article><article class="kpi-card warning"><div><span>งานบริการคงค้าง</span><strong>{{ serviceTickets.filter(t => t.status !== 'เสร็จสิ้น').length }} <small>ใบงาน</small></strong><em>มี 1 งานความสำคัญสูง</em></div><SvgIcon name="settings" /></article><article class="kpi-card"><div><span>สินค้าต้องสั่งเพิ่ม</span><strong>2 <small>รายการ</small></strong><em>แจ้งเตือนจาก Reorder Point</em></div><SvgIcon name="box" /></article></section>
-    <nav class="inventory-tabs operations-tabs" aria-label="เมนูงานลูกค้า"><button :class="{ active: activeTab === 'sales' }" @click="activeTab = 'sales'"><SvgIcon name="quote" />ขายสินค้า <span>ใบเสนอราคา</span></button><button :class="{ active: activeTab === 'appointments' }" @click="activeTab = 'appointments'"><SvgIcon name="solar" />นัดหมายติดตั้ง <span>{{ appointments.length }}</span></button><button :class="{ active: activeTab === 'service' }" @click="activeTab = 'service'"><SvgIcon name="settings" />บริการหลังการขาย <span>{{ serviceTickets.length }}</span></button></nav>
-    <section v-if="activeTab === 'sales'" class="master-detail sales-layout"><div class="list-column"><div class="panel compact"><h3><SvgIcon name="box" />แค็ตตาล็อกสินค้าพร้อมขาย</h3><span class="muted">3 รายการแนะนำ</span></div><article v-for="product in catalog" :key="product.sku" class="product-card"><div class="card-top"><div><b>{{ product.name }}</b><small class="table-subtext">{{ product.sku }} · เหลือ {{ product.stock }} {{ product.unit }}</small></div><strong>฿{{ formatCurrency(product.price) }}</strong></div><small>พร้อมขาย · รับประกันตามมาตรฐาน</small><button class="button primary full" @click="addToBill(product)"><SvgIcon name="plus" />เพิ่มลงใบเสนอราคา</button></article></div><div class="detail-card"><div class="detail-heading"><div><span class="code-tag">DRAFT · QT-25061</span><span class="success-tag">ร่างใบเสนอราคา</span><h2>คุณสมศักดิ์ วัฒนากุล</h2><p>ลูกค้า CUST-2024-089 · สถานที่ติดตั้ง บางพลี สมุทรปราการ</p></div><button class="button secondary" @click="notify('เลือกจากรายชื่อลูกค้าในระบบ')">เปลี่ยนลูกค้า</button></div><h3>รายการสินค้าในใบเสนอราคา</h3><div class="table-scroll"><table class="data-table"><thead><tr><th>รายการ</th><th>จำนวน</th><th>ราคา</th><th></th></tr></thead><tbody><tr v-for="(item, index) in bill" :key="item.sku"><td><strong>{{ item.name }}</strong><small class="table-subtext">{{ item.sku }}</small></td><td>{{ item.qty }} {{ item.unit }}</td><td>฿{{ formatCurrency(item.price * item.qty) }}</td><td><button class="icon-button" title="ลบรายการ" @click="removeItem(index)"><SvgIcon name="close" /></button></td></tr><tr v-if="!bill.length"><td colspan="4" class="empty-state">ยังไม่มีรายการสินค้า กรุณาเลือกสินค้าจากแค็ตตาล็อก</td></tr></tbody></table></div><div class="order-total"><span>ยอดรวมทั้งสิ้น</span><strong>฿{{ formatCurrency(total) }}</strong></div><div class="button-row"><button class="button secondary" @click="activeTab = 'appointments'">ไปสร้างนัดหมาย</button><button class="button primary" @click="saveSale">บันทึกคำสั่งขาย</button></div></div></section>
-    <section v-else-if="activeTab === 'appointments'" class="panel operations-panel"><div class="panel-toolbar"><div><h2 class="section-heading">ปฏิทินนัดหมายติดตั้ง</h2><p class="section-caption">ติดตามคิวทีมช่าง อุปกรณ์ และสถานะการติดตั้งแบบ end-to-end</p></div><button class="button primary" @click="showAppointmentForm = true"><SvgIcon name="plus" />สร้างนัดหมาย</button></div><div class="schedule-strip"><div><small>วันนี้ · 17 มิ.ย.</small><strong>2 งาน</strong></div><div class="selected-day"><small>พุธ · 18 มิ.ย.</small><strong>1 งานติดตั้ง</strong></div><div><small>พฤหัส · 19 มิ.ย.</small><strong>ว่าง</strong></div><div><small>ศุกร์ · 20 มิ.ย.</small><strong>1 งานตรวจหน้างาน</strong></div></div><div class="table-scroll"><table class="data-table operations-table"><thead><tr><th>เลขที่งาน</th><th>ลูกค้า / สถานที่</th><th>วันและเวลา</th><th>ทีมช่าง</th><th>สถานะ</th><th>ดำเนินการ</th></tr></thead><tbody><tr v-for="item in appointments" :key="item.id"><td><span class="sku-code">{{ item.id }}</span><small class="table-subtext">{{ item.type }}</small></td><td><strong>{{ item.customer }}</strong><small class="table-subtext">{{ item.site }}</small></td><td>{{ item.date }}<small class="table-subtext">{{ item.time }}</small></td><td>{{ item.crew }}</td><td><span :class="item.status === 'เสร็จสิ้น' ? 'success-tag' : item.status === 'รอยืนยัน' ? 'warning-tag' : 'code-tag'">{{ item.status }}</span></td><td><button class="button secondary table-button" @click="cycleAppointment(item)">เลื่อนสถานะ</button></td></tr></tbody></table></div><div v-if="showAppointmentForm" class="modal-backdrop" @click.self="showAppointmentForm = false"><form class="modal" @submit.prevent="createAppointment"><div class="modal-heading"><h2>สร้างนัดหมายติดตั้ง</h2><button type="button" class="icon-button" title="ปิด" @click="showAppointmentForm = false"><SvgIcon name="close" /></button></div><label>ลูกค้า<select v-model="newAppointment.customer"><option>คุณสมศักดิ์ วัฒนากุล</option><option>บริษัท พลังงานไทย จำกัด</option><option>บจก. ธนทรัพย์ โลจิสติกส์</option></select></label><label>วันที่นัดหมาย<input v-model="newAppointment.date" type="date" required /></label><label>ช่วงเวลา<select v-model="newAppointment.time"><option>09:00–12:00</option><option>13:00–16:00</option><option>09:00–15:00</option></select></label><label>ทีมช่าง<select v-model="newAppointment.crew"><option>ทีมช่าง A</option><option>ทีมช่าง B</option><option>ทีมช่าง C</option></select></label><div class="button-row end"><button type="button" class="button secondary" @click="showAppointmentForm = false">ยกเลิก</button><button class="button primary" type="submit">บันทึกนัดหมาย</button></div></form></div></section>
-    <section v-else class="operations-service"><div class="service-grid"><div class="panel service-form"><div class="panel-toolbar"><div><h2 class="section-heading">เปิดใบงานบริการ</h2><p class="section-caption">รับแจ้งปัญหา นัดช่าง และเก็บประวัติไว้ที่โปรไฟล์ลูกค้า</p></div><SvgIcon name="settings" size="24" /></div><label>ลูกค้า<select v-model="newTicket.customer"><option>คุณสมศักดิ์ วัฒนากุล</option><option>คุณกมลชนก สุขใจ</option><option>บริษัท พลังงานไทย จำกัด</option></select></label><label>หัวข้อปัญหา<input v-model="newTicket.subject" placeholder="เช่น อินเวอร์เตอร์มี Error Code" /></label><label>ระดับความสำคัญ<select v-model="newTicket.priority"><option>ปกติ</option><option>สูง</option><option>เร่งด่วน</option></select></label><button class="button primary full" @click="createTicket"><SvgIcon name="plus" />เปิดใบงานใหม่</button></div><div class="panel"><div class="panel-toolbar"><div><h2 class="section-heading">คิวบริการหลังการขาย</h2><p class="section-caption">ประวัติและงานที่ต้องติดตามทั้งหมด</p></div><span class="warning-summary">{{ serviceTickets.filter(t => t.status !== 'เสร็จสิ้น').length }} งานคงค้าง</span></div><div class="ticket-list"><article v-for="ticket in serviceTickets" :key="ticket.id" class="ticket-card"><div class="ticket-id"><span class="sku-code">{{ ticket.id }}</span><span :class="ticket.priority === 'สูง' || ticket.priority === 'เร่งด่วน' ? 'warning-tag' : 'success-tag'">{{ ticket.priority }}</span></div><strong>{{ ticket.subject }}</strong><p>{{ ticket.customer }} · เปิด {{ ticket.opened }}</p><div class="ticket-footer"><span>{{ ticket.owner }} · <b>{{ ticket.status }}</b></span><button v-if="ticket.status !== 'เสร็จสิ้น'" class="button secondary table-button" @click="closeTicket(ticket)">ปิดงาน</button><span v-else class="success-tag">เสร็จสิ้น</span></div></article></div></div></div></section>
+    <div class="page-title">
+      <div>
+        <span class="eyebrow">CUSTOMER OPERATIONS</span>
+        <h1>ขายสินค้า · ติดตั้ง · บริการหลังการขาย</h1>
+        <p>จัดการตั้งแต่ใบเสนอราคาไปจนถึงงานบริการในหน้าปฏิบัติการเดียว</p>
+      </div>
+      <span class="online-status">ระบบออนไลน์ (ONLINE)</span>
+    </div>
+    <section class="kpi-grid four">
+      <article class="kpi-card">
+        <div>
+          <span>คำสั่งขายเดือนนี้</span><strong>24 <small>รายการ</small></strong
+          ><em>ยอดขาย ฿1.84M</em>
+        </div>
+        <SvgIcon name="quote" />
+      </article>
+      <article class="kpi-card">
+        <div>
+          <span>นัดหมายติดตั้ง</span><strong>8 <small>ไซต์งาน</small></strong
+          ><em>สัปดาห์นี้ · 2 รอยืนยัน</em>
+        </div>
+        <SvgIcon name="solar" />
+      </article>
+      <article class="kpi-card warning">
+        <div>
+          <span>งานบริการคงค้าง</span
+          ><strong
+            >{{ serviceTickets.filter((t) => t.status !== "เสร็จสิ้น").length }}
+            <small>ใบงาน</small></strong
+          ><em>มี 1 งานความสำคัญสูง</em>
+        </div>
+        <SvgIcon name="settings" />
+      </article>
+      <article class="kpi-card">
+        <div>
+          <span>สินค้าต้องสั่งเพิ่ม</span
+          ><strong>2 <small>รายการ</small></strong
+          ><em>แจ้งเตือนจาก Reorder Point</em>
+        </div>
+        <SvgIcon name="box" />
+      </article>
+    </section>
+    <nav class="inventory-tabs operations-tabs" aria-label="เมนูงานลูกค้า">
+      <button
+        :class="{ active: activeTab === 'sales' }"
+        @click="activeTab = 'sales'"
+      >
+        <SvgIcon name="quote" />ขายสินค้า <span>ใบเสนอราคา</span></button
+      ><button
+        :class="{ active: activeTab === 'appointments' }"
+        @click="activeTab = 'appointments'"
+      >
+        <SvgIcon name="solar" />นัดหมายติดตั้ง
+        <span>{{ appointments.length }}</span></button
+      ><button
+        :class="{ active: activeTab === 'service' }"
+        @click="activeTab = 'service'"
+      >
+        <SvgIcon name="settings" />บริการหลังการขาย
+        <span>{{ serviceTickets.length }}</span>
+      </button>
+    </nav>
+    <section v-if="activeTab === 'sales'" class="master-detail sales-layout">
+      <div class="list-column">
+        <div class="panel compact">
+          <h3><SvgIcon name="box" />แค็ตตาล็อกสินค้าพร้อมขาย</h3>
+          <span class="muted">3 รายการแนะนำ</span>
+        </div>
+        <article
+          v-for="product in catalog"
+          :key="product.sku"
+          class="product-card"
+        >
+          <div class="card-top">
+            <div>
+              <b>{{ product.name }}</b
+              ><small class="table-subtext"
+                >{{ product.sku }} · เหลือ {{ product.stock }}
+                {{ product.unit }}</small
+              >
+            </div>
+            <strong>฿{{ formatCurrency(product.price) }}</strong>
+          </div>
+          <small>พร้อมขาย · รับประกันตามมาตรฐาน</small
+          ><button class="button primary full" @click="addToBill(product)">
+            <SvgIcon name="plus" />เพิ่มลงใบเสนอราคา
+          </button>
+        </article>
+      </div>
+      <div class="detail-card">
+        <div class="detail-heading">
+          <div>
+            <span class="code-tag">DRAFT · QT-25061</span
+            ><span class="success-tag">ร่างใบเสนอราคา</span>
+            <h2>คุณสมศักดิ์ วัฒนากุล</h2>
+            <p>ลูกค้า CUST-2024-089 · สถานที่ติดตั้ง บางพลี สมุทรปราการ</p>
+          </div>
+          <button
+            class="button secondary"
+            @click="notify('เลือกจากรายชื่อลูกค้าในระบบ')"
+          >
+            เปลี่ยนลูกค้า
+          </button>
+        </div>
+        <h3>รายการสินค้าในใบเสนอราคา</h3>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>รายการ</th>
+                <th>จำนวน</th>
+                <th>ราคา</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in bill" :key="item.sku">
+                <td>
+                  <strong>{{ item.name }}</strong
+                  ><small class="table-subtext">{{ item.sku }}</small>
+                </td>
+                <td>{{ item.qty }} {{ item.unit }}</td>
+                <td>฿{{ formatCurrency(item.price * item.qty) }}</td>
+                <td>
+                  <button
+                    class="icon-button"
+                    title="ลบรายการ"
+                    @click="removeItem(index)"
+                  >
+                    <SvgIcon name="close" />
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="!bill.length">
+                <td colspan="4" class="empty-state">
+                  ยังไม่มีรายการสินค้า กรุณาเลือกสินค้าจากแค็ตตาล็อก
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="order-total">
+          <span>ยอดรวมทั้งสิ้น</span
+          ><strong>฿{{ formatCurrency(total) }}</strong>
+        </div>
+        <div class="button-row">
+          <button class="button secondary" @click="activeTab = 'appointments'">
+            ไปสร้างนัดหมาย</button
+          ><button class="button primary" @click="saveSale">
+            บันทึกคำสั่งขาย
+          </button>
+        </div>
+      </div>
+    </section>
+    <section
+      v-else-if="activeTab === 'appointments'"
+      class="panel operations-panel"
+    >
+      <div class="panel-toolbar">
+        <div>
+          <h2 class="section-heading">ปฏิทินนัดหมายติดตั้ง</h2>
+          <p class="section-caption">
+            ติดตามคิวทีมช่าง อุปกรณ์ และสถานะการติดตั้งแบบ end-to-end
+          </p>
+        </div>
+        <button class="button primary" @click="showAppointmentForm = true">
+          <SvgIcon name="plus" />สร้างนัดหมาย
+        </button>
+      </div>
+      <div class="schedule-strip">
+        <div><small>วันนี้ · 17 มิ.ย.</small><strong>2 งาน</strong></div>
+        <div class="selected-day">
+          <small>พุธ · 18 มิ.ย.</small><strong>1 งานติดตั้ง</strong>
+        </div>
+        <div><small>พฤหัส · 19 มิ.ย.</small><strong>ว่าง</strong></div>
+        <div>
+          <small>ศุกร์ · 20 มิ.ย.</small><strong>1 งานตรวจหน้างาน</strong>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table operations-table">
+          <thead>
+            <tr>
+              <th>เลขที่งาน</th>
+              <th>ลูกค้า / สถานที่</th>
+              <th>วันและเวลา</th>
+              <th>ทีมช่าง</th>
+              <th>สถานะ</th>
+              <th>ดำเนินการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in appointments" :key="item.id">
+              <td>
+                <span class="sku-code">{{ item.id }}</span
+                ><small class="table-subtext">{{ item.type }}</small>
+              </td>
+              <td>
+                <strong>{{ item.customer }}</strong
+                ><small class="table-subtext">{{ item.site }}</small>
+              </td>
+              <td>
+                {{ item.date
+                }}<small class="table-subtext">{{ item.time }}</small>
+              </td>
+              <td>{{ item.crew }}</td>
+              <td>
+                <span
+                  :class="
+                    item.status === 'เสร็จสิ้น'
+                      ? 'success-tag'
+                      : item.status === 'รอยืนยัน'
+                        ? 'warning-tag'
+                        : 'code-tag'
+                  "
+                  >{{ item.status }}</span
+                >
+              </td>
+              <td>
+                <button
+                  class="button secondary table-button"
+                  @click="cycleAppointment(item)"
+                >
+                  เลื่อนสถานะ
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div
+        v-if="showAppointmentForm"
+        class="modal-backdrop"
+        @click.self="showAppointmentForm = false"
+      >
+        <form class="modal" @submit.prevent="createAppointment">
+          <div class="modal-heading">
+            <h2>สร้างนัดหมายติดตั้ง</h2>
+            <button
+              type="button"
+              class="icon-button"
+              title="ปิด"
+              @click="showAppointmentForm = false"
+            >
+              <SvgIcon name="close" />
+            </button>
+          </div>
+          <label
+            >ลูกค้า<select v-model="newAppointment.customer">
+              <option>คุณสมศักดิ์ วัฒนากุล</option>
+              <option>บริษัท พลังงานไทย จำกัด</option>
+              <option>บจก. ธนทรัพย์ โลจิสติกส์</option>
+            </select></label
+          ><label
+            >วันที่นัดหมาย<input
+              v-model="newAppointment.date"
+              type="date"
+              required /></label
+          ><label
+            >ช่วงเวลา<select v-model="newAppointment.time">
+              <option>09:00–12:00</option>
+              <option>13:00–16:00</option>
+              <option>09:00–15:00</option>
+            </select></label
+          ><label
+            >ทีมช่าง<select v-model="newAppointment.crew">
+              <option>ทีมช่าง A</option>
+              <option>ทีมช่าง B</option>
+              <option>ทีมช่าง C</option>
+            </select></label
+          >
+          <div class="button-row end">
+            <button
+              type="button"
+              class="button secondary"
+              @click="showAppointmentForm = false"
+            >
+              ยกเลิก</button
+            ><button class="button primary" type="submit">บันทึกนัดหมาย</button>
+          </div>
+        </form>
+      </div>
+    </section>
+    <section v-else class="operations-service">
+      <div class="service-grid">
+        <div class="panel service-form">
+          <div class="panel-toolbar">
+            <div>
+              <h2 class="section-heading">เปิดใบงานบริการ</h2>
+              <p class="section-caption">
+                รับแจ้งปัญหา นัดช่าง และเก็บประวัติไว้ที่โปรไฟล์ลูกค้า
+              </p>
+            </div>
+            <SvgIcon name="settings" size="24" />
+          </div>
+          <label
+            >ลูกค้า<select v-model="newTicket.customer">
+              <option>คุณสมศักดิ์ วัฒนากุล</option>
+              <option>คุณกมลชนก สุขใจ</option>
+              <option>บริษัท พลังงานไทย จำกัด</option>
+            </select></label
+          ><label
+            >หัวข้อปัญหา<input
+              v-model="newTicket.subject"
+              placeholder="เช่น อินเวอร์เตอร์มี Error Code" /></label
+          ><label
+            >ระดับความสำคัญ<select v-model="newTicket.priority">
+              <option>ปกติ</option>
+              <option>สูง</option>
+              <option>เร่งด่วน</option>
+            </select></label
+          ><button class="button primary full" @click="createTicket">
+            <SvgIcon name="plus" />เปิดใบงานใหม่
+          </button>
+        </div>
+        <div class="panel">
+          <div class="panel-toolbar">
+            <div>
+              <h2 class="section-heading">คิวบริการหลังการขาย</h2>
+              <p class="section-caption">ประวัติและงานที่ต้องติดตามทั้งหมด</p>
+            </div>
+            <span class="warning-summary"
+              >{{
+                serviceTickets.filter((t) => t.status !== "เสร็จสิ้น").length
+              }}
+              งานคงค้าง</span
+            >
+          </div>
+          <div class="ticket-list">
+            <article
+              v-for="ticket in serviceTickets"
+              :key="ticket.id"
+              class="ticket-card"
+            >
+              <div class="ticket-id">
+                <span class="sku-code">{{ ticket.id }}</span
+                ><span
+                  :class="
+                    ticket.priority === 'สูง' || ticket.priority === 'เร่งด่วน'
+                      ? 'warning-tag'
+                      : 'success-tag'
+                  "
+                  >{{ ticket.priority }}</span
+                >
+              </div>
+              <strong>{{ ticket.subject }}</strong>
+              <p>{{ ticket.customer }} · เปิด {{ ticket.opened }}</p>
+              <div class="ticket-footer">
+                <span
+                  >{{ ticket.owner }} · <b>{{ ticket.status }}</b></span
+                ><button
+                  v-if="ticket.status !== 'เสร็จสิ้น'"
+                  class="button secondary table-button"
+                  @click="closeTicket(ticket)"
+                >
+                  ปิดงาน</button
+                ><span v-else class="success-tag">เสร็จสิ้น</span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
     <div v-if="toast" class="toast"><SvgIcon name="check" />{{ toast }}</div>
   </AppShell>
 </template>
