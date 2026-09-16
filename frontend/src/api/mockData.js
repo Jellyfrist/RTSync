@@ -1,0 +1,359 @@
+// ข้อมูลตัวอย่างสำหรับเปิดดู UI ได้ทันทีเมื่อยังไม่ได้รัน backend
+export const MOCK_CATEGORIES = [
+  { category_id: "CAT-001", name: "อินเวอร์เตอร์" },
+  { category_id: "CAT-002", name: "อุปกรณ์ติดตั้ง" },
+  { category_id: "CAT-003", name: "อุปกรณ์วัด" },
+  { category_id: "CAT-004", name: "แบตเตอรี่" },
+  { category_id: "CAT-005", name: "แผงโซลาร์" },
+];
+
+export const MOCK_SUPPLIER_CATEGORIES = [
+  { category_id: "SCAT-001", name: "Inverter & Monitoring" },
+  { category_id: "SCAT-002", name: "Solar Panels" },
+  { category_id: "SCAT-003", name: "Electrical & Mounting" },
+];
+
+export const MOCK_SUPPLIERS = [
+  {
+    id: "SUP-TH-019",
+    name: "Huawei Solar",
+    category: "Inverter & Monitoring",
+    description: "อินเวอร์เตอร์และอุปกรณ์ตรวจวัด",
+    delivery: "1 วัน",
+    sku_count: 3,
+  },
+  {
+    id: "SUP-TH-001",
+    name: "JA Solar Thailand",
+    category: "Solar Panels",
+    description: "ผู้จัดจำหน่ายแผงโซลาร์ JA Solar",
+    delivery: "2-3 วัน",
+    sku_count: 1,
+  },
+  {
+    id: "SUP-TH-020",
+    name: "LONGi Thailand",
+    category: "Solar Panels",
+    description: "ผู้จัดจำหน่ายแผงโซลาร์ LONGi",
+    delivery: "2-3 วัน",
+    sku_count: 1,
+  },
+  {
+    id: "SUP-TH-025",
+    name: "Solar Cable Co.",
+    category: "Electrical & Mounting",
+    description: "สายไฟและอุปกรณ์ประกอบระบบโซลาร์",
+    delivery: "3-5 วัน",
+    sku_count: 2,
+  },
+];
+
+export const MOCK_PRODUCTS = [
+  {
+    sku: "INV-HW-10K3P",
+    name: "Huawei SUN2000-10KTL-M1",
+    category: "อินเวอร์เตอร์",
+    supplier: "Huawei Solar",
+    stock: 6,
+    unit: "เครื่อง",
+    reorderPoint: 10,
+    price: 58900,
+    status: "ต้องสั่งเพิ่ม",
+  },
+  {
+    sku: "INV-HW-5K1P",
+    name: "Huawei SUN2000-5KTL",
+    category: "อินเวอร์เตอร์",
+    supplier: "Huawei Solar",
+    stock: 12,
+    unit: "เครื่อง",
+    reorderPoint: 8,
+    price: 42900,
+    status: "พร้อมขาย",
+  },
+  {
+    sku: "SEN-HW-DTSU",
+    name: "Huawei Smart Power Sensor",
+    category: "อุปกรณ์วัด",
+    supplier: "Huawei Solar",
+    stock: 24,
+    unit: "ชุด",
+    reorderPoint: 12,
+    price: 5200,
+    status: "พร้อมขาย",
+  },
+  {
+    sku: "PAN-JA-550W",
+    name: "JA Solar 550W Mono",
+    category: "แผงโซลาร์",
+    supplier: "JA Solar Thailand",
+    stock: 48,
+    unit: "แผง",
+    reorderPoint: 30,
+    price: 4250,
+    status: "พร้อมขาย",
+  },
+  {
+    sku: "PAN-LG-585W",
+    name: "LONGi Hi-MO 7 585W",
+    category: "แผงโซลาร์",
+    supplier: "LONGi Thailand",
+    stock: 18,
+    unit: "แผง",
+    reorderPoint: 24,
+    price: 4680,
+    status: "ต้องสั่งเพิ่ม",
+  },
+  {
+    sku: "CAB-SOLAR-6MM",
+    name: "สายโซลาร์ PV1-F 6 sq.mm.",
+    category: "อุปกรณ์ติดตั้ง",
+    supplier: "Solar Cable Co.",
+    stock: 320,
+    unit: "เมตร",
+    reorderPoint: 100,
+    price: 42,
+    status: "พร้อมขาย",
+  },
+];
+
+// ล็อตต้นทุนเริ่มต้น: Stock เดิมทั้งหมดซื้อด้วยราคาปัจจุบันของสินค้า
+MOCK_PRODUCTS.forEach((product) => {
+  product.costPrice = product.price;
+  product.salePrice = Math.ceil((product.price * 1.2) / 10) * 10;
+  product.costLots = [{ receivedAt: "2025-09-01T09:00:00.000Z", quantity: product.stock, unitCost: product.price }];
+});
+
+export const MOCK_CUSTOMERS = [
+  {
+    id: "CUST-2025-001",
+    code: "CUST-2025-001",
+    name: "คุณสมศักดิ์ วัฒนกุล",
+    phone: "081-234-5678",
+    location: "บ้านพักอาศัย · เชียงใหม่",
+    customer_type: "บ้านพักอาศัย",
+    system: "Huawei 10 kW",
+    status: "ชำระครบถ้วน",
+  },
+  {
+    id: "CUST-2025-002",
+    code: "CUST-2025-002",
+    name: "บริษัท กรีนฟาร์ม จำกัด",
+    phone: "02-456-7890",
+    location: "โรงงาน · ลำพูน",
+    customer_type: "ธุรกิจ/โรงงาน",
+    system: "Huawei 50 kW",
+    status: "รอนัดตรวจเช็ก",
+  },
+  {
+    id: "CUST-2025-003",
+    code: "CUST-2025-003",
+    name: "คุณปรียาภรณ์ จันทร์ดี",
+    phone: "089-765-4321",
+    location: "บ้านพักอาศัย · กรุงเทพฯ",
+    customer_type: "บ้านพักอาศัย",
+    system: "LONGi 5 kW",
+    status: "ชำระครบถ้วน",
+  },
+  {
+    id: "CUST-2025-004",
+    code: "CUST-2025-004",
+    name: "บริษัท สยามออโต้พาร์ท จำกัด",
+    phone: "02-987-6543",
+    location: "สำนักงาน · อยุธยา",
+    customer_type: "ธุรกิจ/โรงงาน",
+    system: "JA Solar 30 kW",
+    status: "รอเปิดบัญชี",
+  },
+];
+
+export const MOCK_CATALOG = MOCK_PRODUCTS.slice(0, 3).map((product) => ({
+  ...product,
+  price: product.salePrice,
+  stock: product.stock,
+}));
+
+export const MOCK_EMPLOYEES = [
+  { id: "EMP-TH-014", name: "สมนึก บุญส่ง", role: "หัวหน้าช่างติดตั้งโซล่าเซลล์", salary: 24000, overtime_hours: 28, overtime_rate: 250, allowance: 1200, deduction: 500, initials: "สบ" },
+  { id: "EMP-TH-021", name: "ณัฐพล แสนสุข", role: "ช่างติดตั้งไฟฟ้า Rooftop", salary: 18500, overtime_hours: 34.5, overtime_rate: 180, allowance: 800, deduction: 0, initials: "ณส" },
+  { id: "EMP-TH-008", name: "วราภรณ์ วงศ์ศิริ", role: "วิศวกรออกแบบระบบ", salary: 32000, overtime_hours: 12, overtime_rate: 300, allowance: 1500, deduction: 1200, initials: "วว" },
+  { id: "EMP-TH-019", name: "กิตติชัย มั่นคง", role: "เจ้าหน้าที่ตรวจสอบมาตรฐาน QA", salary: 22000, overtime_hours: 18, overtime_rate: 200, allowance: 600, deduction: 0, initials: "กม" },
+];
+
+export const MOCK_SALES = [
+  {
+    id: "SO-250901", customer: "คุณสมศักดิ์ วัฒนกุล", customerCode: "CUST-2025-001",
+    items: [{ sku: "INV-HW-10K3P", name: "Huawei SUN2000-10KTL-M1", qty: 1, unit: "เครื่อง", price: 58900 }],
+    total: 58900, paymentStatus: "ชำระมัดจำ", orderStatus: "ยืนยันคำสั่งซื้อ", createdAt: "2025-09-01T09:00:00.000Z",
+  },
+  {
+    id: "SO-250902", customer: "บริษัท กรีนฟาร์ม จำกัด", customerCode: "CUST-2025-002",
+    items: [{ sku: "INV-HW-5K1P", name: "Huawei SUN2000-5KTL", qty: 2, unit: "เครื่อง", price: 42900 }],
+    total: 85800, paymentStatus: "รอชำระส่วนที่เหลือ", orderStatus: "กำลังเตรียมสินค้า", createdAt: "2025-09-02T10:30:00.000Z",
+  },
+];
+
+export const MOCK_PURCHASE_ORDERS = [
+  { id: "PO-250901", supplierId: "SUP-TH-019", supplier: "Huawei Solar", status: "กำลังจัดซื้อ", createdAt: "2025-09-01", items: [{ sku: "INV-HW-10K3P", name: "Huawei SUN2000-10KTL-M1", qty: 6, unit: "เครื่อง", price: 58900 }], total: 353400 },
+  { id: "PO-250902", supplierId: "SUP-TH-020", supplier: "LONGi Thailand", status: "รอดำเนินการ", createdAt: "2025-09-02", items: [{ sku: "PAN-LG-585W", name: "LONGi Hi-MO 7 585W", qty: 6, unit: "แผง", price: 4680 }], total: 28080 },
+];
+
+const now = new Date();
+const toISODate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+const dateFromToday = (offset) => {
+  const date = new Date(now);
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + offset);
+  return toISODate(date);
+};
+const displayDate = (offset) =>
+  new Intl.DateTimeFormat("th-TH-u-ca-gregory", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(`${dateFromToday(offset)}T00:00:00`));
+const shortDateCode = (offset) => dateFromToday(offset).replaceAll("-", "").slice(2);
+
+// Mock งานปัจจุบันอิงจากวันที่เครื่อง เพื่อเปิดดูหน้า UI ได้สมจริงในทุกวัน
+export const MOCK_APPOINTMENTS = [
+  {
+    id: `INS-${shortDateCode(-12)}`,
+    customer: "คุณสมศักดิ์ วัฒนกุล",
+    site: "บ้านพักอาศัย · เชียงใหม่",
+    date: dateFromToday(-12),
+    time: "09:00–12:00",
+    crew: "ทีมช่าง A",
+    employees: ["ณัฐพล แสนสุข", "กิตติชัย มั่นคง"],
+    status: "ยืนยันแล้ว",
+    type: "ติดตั้งระบบ",
+  },
+  {
+    id: `INS-${shortDateCode(-5)}`,
+    customer: "บริษัท กรีนฟาร์ม จำกัด",
+    site: "โรงงาน · ลำพูน",
+    date: dateFromToday(-5),
+    time: "09:00–15:00",
+    crew: "ทีมช่าง B",
+    employees: ["วราภรณ์ วงศ์ศิริ"],
+    status: "เตรียมอุปกรณ์",
+    type: "ติดตั้งระบบ",
+  },
+  {
+    id: `INS-${shortDateCode(0)}`,
+    customer: "คุณปรียาภรณ์ จันทร์ดี",
+    site: "บ้านพักอาศัย · กรุงเทพฯ",
+    date: dateFromToday(0),
+    time: "13:00–16:00",
+    crew: "ทีมช่าง C",
+    employees: ["กิตติชัย มั่นคง", "ณัฐพล แสนสุข"],
+    status: "รอยืนยัน",
+    type: "ตรวจหน้างาน",
+  },
+  {
+    id: `INS-${shortDateCode(4)}`,
+    customer: "บริษัท สยามออโต้พาร์ท จำกัด",
+    site: "สำนักงาน · อยุธยา",
+    date: dateFromToday(4),
+    time: "09:00–12:00",
+    crew: "ทีมช่าง A",
+    employees: ["ณัฐพล แสนสุข"],
+    status: "ยืนยันแล้ว",
+    type: "ติดตั้งระบบ",
+  },
+  {
+    id: `INS-${shortDateCode(18)}`,
+    customer: "บริษัท พลังงานไทย จำกัด",
+    site: "สำนักงาน · ชลบุรี",
+    date: dateFromToday(18),
+    time: "09:00–12:00",
+    crew: "ทีมช่าง B",
+    employees: ["วราภรณ์ วงศิริ"],
+    status: "รอยืนยัน",
+    type: "ติดตั้งระบบ",
+  },
+];
+
+export const MOCK_SERVICE_TICKETS = [
+  {
+    id: `SRV-${shortDateCode(-10)}`,
+    customer: "คุณสมศักดิ์ วัฒนกุล",
+    site: "บ้านพักอาศัย · เชียงใหม่",
+    date: dateFromToday(-10),
+    time: "10:00–12:00",
+    crew: "ทีมบริการ A",
+    employees: ["ณัฐพล แสนสุข"],
+    subject: "ตรวจเช็กประจำปี",
+    opened: displayDate(-17),
+    priority: "ปกติ",
+    status: "นัดหมายแล้ว",
+    owner: "ณัฐพล แสนสุข",
+  },
+  {
+    id: `SRV-${shortDateCode(-3)}`,
+    customer: "บริษัท กรีนฟาร์ม จำกัด",
+    site: "โรงงาน · ลำพูน",
+    date: dateFromToday(-3),
+    time: "13:00–16:00",
+    crew: "ทีมบริการ B",
+    employees: ["กิตติชัย มั่นคง", "วราภรณ์ วงศิริ"],
+    subject: "อินเวอร์เตอร์แจ้งเตือน",
+    opened: displayDate(-7),
+    priority: "สูง",
+    status: "รอมอบหมาย",
+    owner: "รอมอบหมาย",
+  },
+  {
+    id: `SRV-${shortDateCode(0)}`,
+    customer: "คุณปรียาภรณ์ จันทร์ดี",
+    site: "บ้านพักอาศัย · กรุงเทพฯ",
+    date: dateFromToday(0),
+    time: "09:00–12:00",
+    crew: "ทีมบริการ C",
+    employees: ["กิตติชัย มั่นคง"],
+    subject: "ปรับปรุงระบบ Monitoring",
+    opened: displayDate(-1),
+    priority: "ปกติ",
+    status: "ยืนยันแล้ว",
+    owner: "กิตติชัย มั่นคง",
+  },
+  {
+    id: `SRV-${shortDateCode(7)}`,
+    customer: "บริษัท สยามออโต้พาร์ท จำกัด",
+    site: "สำนักงาน · อยุธยา",
+    date: dateFromToday(7),
+    time: "10:00–12:00",
+    crew: "ทีมบริการ A",
+    employees: ["ณัฐพล แสนสุข", "วราภรณ์ วงศ์ศิริ"],
+    subject: "ตรวจเช็กระบบหลังติดตั้ง",
+    opened: displayDate(0),
+    priority: "ปกติ",
+    status: "รอมอบหมาย",
+    owner: "รอมอบหมาย",
+  },
+  {
+    id: `SRV-${shortDateCode(21)}`,
+    customer: "บริษัท พลังงานไทย จำกัด",
+    site: "สำนักงาน · ชลบุรี",
+    date: dateFromToday(21),
+    time: "09:00–12:00",
+    crew: "ทีมบริการ C",
+    employees: ["วราภรณ์ วงศ์ศิริ"],
+    subject: "เปลี่ยนอะไหล่ระบบ Monitoring",
+    opened: displayDate(7),
+    priority: "สูง",
+    status: "รอเปิดงาน",
+    owner: "รอมอบหมาย",
+  },
+];
+
+export const MOCK_FUEL_CLAIMS = [
+  { id: "FUEL-260916-01", source: "ติดตั้ง", employee: "ณัฐพล แสนสุข", job: "INS-260916", date: dateFromToday(0), amount: 680, receipt: "RC-260916-01", status: "รอตรวจสอบ" },
+  { id: "FUEL-260913-02", source: "บริการหลังการขาย", employee: "กิตติชัย มั่นคง", job: "SRV-260913", date: dateFromToday(-3), amount: 420, receipt: "RC-260913-02", status: "อนุมัติแล้ว" },
+  { id: "FUEL-260906-03", source: "ติดตั้ง", employee: "วราภรณ์ วงศ์ศิริ", job: "INS-260906", date: dateFromToday(-10), amount: 560, receipt: "RC-260906-03", status: "อนุมัติแล้ว" },
+  { id: "FUEL-260923-04", source: "บริการหลังการขาย", employee: "ณัฐพล แสนสุข", job: "SRV-260923", date: dateFromToday(7), amount: 390, receipt: "รอแนบใบเสร็จ", status: "รอเอกสาร" },
+];

@@ -1,15 +1,20 @@
 <script setup>
-// ไฟล์นี้แสดงพนักงานและคำนวณเงินเดือนกับค่าล่วงเวลา
+// ไฟล์นี้แสดงข้อมูลพนักงาน เงินเดือน และตารางงาน
 import { computed, onMounted, ref } from "vue";
-import AppShell from "@/components/AppShell.vue";
+import AppShell from "@/components/layout/AppShell.vue";
+import AppPageHeader from "@/components/ui/AppPageHeader.vue";
+import AppSearchField from "@/components/ui/AppSearchField.vue";
 import SvgIcon from "@/components/SvgIcon.vue";
+import TablePagination from "@/components/TablePagination.vue";
 import { peopleApi } from "@/api/peopleApi";
+import { mockDb } from "@/api/mockDb";
 
 // รายชื่อพนักงานจาก API
 const employees = ref([]);
 const activeId = ref("");
 const collapsed = ref(false);
 const search = ref("");
+const roleFilter = ref("ทั้งหมด");
 const toast = ref("");
 const showModal = ref(false);
 const editingEmployee = ref(null);
@@ -17,8 +22,6 @@ const form = ref({
   name: "",
   role: "",
   salary: 0,
-  otHours: 0,
-  otRate: 200,
   allowance: 0,
   deduction: 0,
 });
@@ -29,21 +32,28 @@ onMounted(async () => {
 });
 const visibleEmployees = computed(() =>
   employees.value.filter((item) =>
-    `${item.name} ${item.role}`
+    (roleFilter.value === "ทั้งหมด" || item.role === roleFilter.value) &&
+    `${item.name} ${item.role} ${item.id}`
       .toLowerCase()
       .includes(search.value.toLowerCase()),
   ),
 );
+const roleOptions = computed(() => [
+  "ทั้งหมด",
+  ...new Set(employees.value.map((item) => item.role).filter(Boolean)),
+]);
+const totalNetPayroll = computed(() =>
+  employees.value.reduce((sum, employee) => sum + employee.salary + employee.allowance - employee.deduction, 0),
+);
 const activeEmployee = computed(() =>
   employees.value.find((item) => item.id === activeId.value),
 );
-// คำนวณค่าล่วงเวลา ยอดก่อนหัก และยอดสุทธิของพนักงานที่เลือก
+// คำนวณยอดก่อนหักและยอดสุทธิของพนักงานที่เลือก (ไม่มีระบบ OT)
 const payroll = computed(() => {
   const e = activeEmployee.value;
-  if (!e) return { ot: 0, gross: 0, net: 0 };
-  const ot = e.otHours * e.otRate;
-  const gross = e.salary + ot + e.allowance;
-  return { ot, gross, net: gross - e.deduction };
+  if (!e) return { gross: 0, net: 0 };
+  const gross = e.salary + e.allowance;
+  return { gross, net: gross - e.deduction };
 });
 const money = (value) =>
   `฿${Number(value).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -58,8 +68,6 @@ function resetForm() {
     name: "",
     role: "",
     salary: 0,
-    otHours: 0,
-    otRate: 200,
     allowance: 0,
     deduction: 0,
   };
@@ -75,8 +83,6 @@ function openEdit() {
     name: e.name,
     role: e.role,
     salary: e.salary,
-    otHours: e.otHours,
-    otRate: e.otRate,
     allowance: e.allowance,
     deduction: e.deduction,
   };
@@ -89,8 +95,6 @@ function saveEmployee() {
   const values = {
     ...form.value,
     salary: Number(form.value.salary),
-    otHours: Number(form.value.otHours),
-    otRate: Number(form.value.otRate),
     allowance: Number(form.value.allowance),
     deduction: Number(form.value.deduction),
   };
@@ -100,6 +104,7 @@ function saveEmployee() {
     employees.value.push({ ...values, id, initials: values.name.slice(0, 2) });
     activeId.value = id;
   }
+  mockDb.set("employees", employees.value);
   showModal.value = false;
   notify(
     editingEmployee.value ? "บันทึกข้อมูลพนักงานแล้ว" : "เพิ่มพนักงานใหม่แล้ว",
@@ -107,22 +112,61 @@ function saveEmployee() {
 }
 function calculatePayroll() {
   notify(
-    `คำนวณค่าจ้าง ${activeEmployee.value.name} แล้ว · สุทธิ ${money(payroll.value.net)}`,
+    `คำนวณเงินเดือน ${activeEmployee.value.name} แล้ว · สุทธิ ${money(payroll.value.net)}`,
   );
 }
 </script>
 
 <template>
-  <AppShell placeholder="ค้นหาพนักงาน, รหัสพนักงาน...">
-    <div class="page-title">
-      <div>
-        <span class="eyebrow">PEOPLE & PAYROLL</span>
-        <h1>ค่าตอบแทนและ OT พนักงาน</h1>
-        <p>จัดการข้อมูลพนักงาน คำนวณค่าแรง ค่าล่วงเวลา และค่าจ้างรายเดือน</p>
+  <AppShell>
+    <AppPageHeader
+      eyebrow="PEOPLE & PAYROLL"
+      title="ข้อมูลพนักงานและเงินเดือน"
+      description="จัดการข้อมูลพนักงาน เงินเดือน ตารางงาน และการเบิกค่าน้ำมัน"
+    />
+    <section class="operations-table-section employee-directory-section">
+      <div class="task-table-heading">
+        <div>
+          <h2 class="section-heading">รายชื่อพนักงาน</h2>
+          <p class="section-caption">จัดการข้อมูลบุคลากรและเปิดดูรายละเอียดค่าตอบแทนรายบุคคล</p>
+        </div>
+        <button class="button primary" type="button" @click="openAdd">
+          <SvgIcon name="plus" />เพิ่มพนักงาน
+        </button>
       </div>
-      <button class="button primary" @click="openAdd">
-        <SvgIcon name="plus" />เพิ่มพนักงาน
-      </button>
+      <div class="task-overview-grid">
+        <div><span>พนักงานทั้งหมด</span><strong>{{ employees.length }} คน</strong><small>ข้อมูลบุคลากรในระบบ</small></div>
+        <div><span>พร้อมมอบหมายงาน</span><strong>{{ employees.length }} คน</strong><small>ทีมติดตั้งและบริการ</small></div>
+        <div><span>ค่าจ้างรวมสุทธิ</span><strong>{{ money(totalNetPayroll) }}</strong><small>คำนวณจากข้อมูลปัจจุบัน</small></div>
+      </div>
+      <div class="task-table-tools table-filters-below-overview employee-table-filters">
+        <AppSearchField v-model="search" class-name="table-filter-search" placeholder="ค้นหาชื่อพนักงาน รหัส หรือ ตำแหน่ง..." label="ค้นหาพนักงาน" />
+        <div class="table-filter-select control-field"><span>ตำแหน่ง</span><select v-model="roleFilter" aria-label="กรองตำแหน่งพนักงาน"><option v-for="role in roleOptions" :key="role">{{ role }}</option></select></div>
+      </div>
+      <div class="table-scroll employee-directory-table-wrap">
+        <table class="data-table employee-directory-table">
+          <thead><tr><th>รหัสพนักงาน</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>เงินเดือนพื้นฐาน</th><th>สถานะ</th><th aria-label="เปิดรายละเอียด"></th></tr></thead>
+          <tbody>
+            <template v-for="employee in visibleEmployees" :key="employee.id">
+              <tr class="employee-directory-row" :class="{ selected: activeId === employee.id }" :aria-expanded="activeId === employee.id" tabindex="0" @click="activeId = activeId === employee.id ? '' : employee.id" @keydown.enter.prevent="activeId = activeId === employee.id ? '' : employee.id" @keydown.space.prevent="activeId = activeId === employee.id ? '' : employee.id">
+                <td><span class="code-tag">{{ employee.id }}</span></td>
+                <td><strong>{{ employee.name }}</strong></td>
+                <td>{{ employee.role }}</td>
+                <td class="mono">{{ money(employee.salary) }}</td>
+                <td><span class="success-tag">กำลังทำงาน</span></td>
+                <td class="employee-table-action"><button class="icon-button" :aria-label="`ดูรายละเอียด ${employee.name}`" @click.stop="activeId = activeId === employee.id ? '' : employee.id"><SvgIcon name="chevron-right" size="20" /></button></td>
+              </tr>
+              <tr v-if="activeId === employee.id" class="employee-detail-row"><td colspan="6"><div class="detail-card employee-inline-detail"><div class="detail-heading"><div><span class="code-tag">{{ employee.id }}</span><h2>{{ employee.name }}</h2><p>{{ employee.role }}</p></div><button class="button secondary" type="button" @click.stop="openEdit"><SvgIcon name="edit" />แก้ไขข้อมูล</button></div><div class="info-grid"><div><small>เงินเดือนพื้นฐาน</small><strong>{{ money(employee.salary) }}</strong></div><div><small>ค่าจ้างสุทธิ</small><strong class="text-success">{{ money(employee.salary + employee.allowance - employee.deduction) }}</strong></div></div></div></td></tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <TablePagination :total="visibleEmployees.length" label="รายการพนักงาน" />
+    </section>
+    <div v-if="false">
+    <div class="section-divider">
+      <span class="section-kicker">01</span>
+      <div><strong>ภาพรวมทีมงาน</strong><small>สถานะพนักงาน ค่าจ้าง และค่าใช้จ่ายที่ต้องติดตาม</small></div>
     </div>
     <section class="kpi-grid four">
       <article class="kpi-card">
@@ -135,21 +179,17 @@ function calculatePayroll() {
       </article>
       <article class="kpi-card">
         <div>
-          <span>ชั่วโมง OT รวม</span
-          ><strong
-            >{{ employees.reduce((sum, e) => sum + e.otHours, 0) }}
-            <small>ชม.</small></strong
-          ><em>รอบเงินเดือน มิ.ย. 2025</em>
+          <span>พนักงานมีตารางงาน</span
+          ><strong>{{ employees.length }} <small>คน</small></strong
+          ><em>พร้อมมอบหมายงานติดตั้ง/บริการ</em>
         </div>
         <SvgIcon name="settings" />
       </article>
       <article class="kpi-card warning">
         <div>
-          <span>ยอดค่า OT รวม</span
-          ><strong>{{
-            money(employees.reduce((sum, e) => sum + e.otHours * e.otRate, 0))
-          }}</strong
-          ><em>รอตรวจสอบ 4 รายการ</em>
+          <span>เบิกค่าน้ำมันเดือนนี้</span
+          ><strong>{{ money(3250) }}</strong
+          ><em>รอตรวจสอบ 2 รายการ</em>
         </div>
         <SvgIcon name="wallet" />
       </article>
@@ -161,9 +201,7 @@ function calculatePayroll() {
               employees.reduce(
                 (sum, e) =>
                   sum +
-                  e.salary +
-                  e.otHours * e.otRate +
-                  e.allowance -
+                  e.salary + e.allowance -
                   e.deduction,
                 0,
               ),
@@ -174,6 +212,10 @@ function calculatePayroll() {
         <SvgIcon name="wallet" />
       </article>
     </section>
+    <div class="section-divider">
+      <span class="section-kicker">02</span>
+      <div><strong>พื้นที่จัดการพนักงาน</strong><small>เลือกพนักงานเพื่อดูข้อมูลเงินเดือนและตารางงาน</small></div>
+    </div>
     <section class="payroll-workbench">
       <div class="employee-list" :class="{ collapsed }">
         <div class="panel-toolbar">
@@ -186,12 +228,12 @@ function calculatePayroll() {
             <SvgIcon name="grid" />
           </button>
         </div>
-        <div class="search-inline" v-if="!collapsed">
-          <SvgIcon name="search" /><input
-            v-model="search"
-            placeholder="ค้นหาพนักงาน"
-          />
-        </div>
+        <AppSearchField
+          v-if="!collapsed"
+          v-model="search"
+          placeholder="ค้นหาพนักงาน"
+          label="ค้นหาพนักงาน"
+        />
         <button
           v-for="employee in visibleEmployees"
           :key="employee.id"
@@ -203,7 +245,7 @@ function calculatePayroll() {
           ><span v-if="!collapsed"
             ><strong>{{ employee.name }}</strong
             ><small>{{ employee.role }}</small
-            ><em>OT {{ employee.otHours }} ชม.</em></span
+            ><em>เงินเดือน {{ money(employee.salary) }}</em></span
           >
         </button>
       </div>
@@ -219,7 +261,7 @@ function calculatePayroll() {
             <button class="button secondary" @click="openEdit">
               <SvgIcon name="edit" />แก้ไขข้อมูล</button
             ><button class="button primary" @click="calculatePayroll">
-              คำนวณค่าจ้าง
+              คำนวณเงินเดือน
             </button>
           </div>
         </div>
@@ -227,13 +269,6 @@ function calculatePayroll() {
           <div>
             <small>เงินเดือนพื้นฐาน</small
             ><strong>{{ money(activeEmployee.salary) }}</strong>
-          </div>
-          <div>
-            <small>ค่า OT เดือนนี้</small
-            ><strong
-              >{{ money(payroll.ot) }}
-              <small>({{ activeEmployee.otHours }} ชม.)</small></strong
-            >
           </div>
           <div>
             <small>ค่าจ้างสุทธิ</small
@@ -258,15 +293,6 @@ function calculatePayroll() {
               <td><span class="success-tag">พร้อมจ่าย</span></td>
             </tr>
             <tr>
-              <td>ค่าล่วงเวลา (OT)</td>
-              <td>
-                {{ activeEmployee.otHours }} ชม. ×
-                {{ money(activeEmployee.otRate) }}
-              </td>
-              <td>{{ money(payroll.ot) }}</td>
-              <td><span class="warning-tag">รอตรวจสอบ</span></td>
-            </tr>
-            <tr>
               <td>ค่าเบี้ยเลี้ยง/ค่าจ้างเพิ่มเติม</td>
               <td>รอบเดือนนี้</td>
               <td>{{ money(activeEmployee.allowance) }}</td>
@@ -282,6 +308,7 @@ function calculatePayroll() {
             </tr>
           </tbody>
         </table>
+        <TablePagination :total="3" label="รายการค่าตอบแทน" />
         <div class="payroll-total">
           <div>
             <span>รวมก่อนหัก</span><strong>{{ money(payroll.gross) }}</strong>
@@ -292,6 +319,7 @@ function calculatePayroll() {
         </div>
       </div>
     </section>
+    </div>
     <div
       v-if="showModal"
       class="modal-backdrop"
@@ -328,17 +356,6 @@ function calculatePayroll() {
           ><label
             >เงินเดือนพื้นฐาน<input
               v-model="form.salary"
-              type="number"
-              min="0" /></label
-          ><label
-            >ชั่วโมง OT<input
-              v-model="form.otHours"
-              type="number"
-              min="0"
-              step="0.5" /></label
-          ><label
-            >อัตรา OT ต่อชั่วโมง<input
-              v-model="form.otRate"
               type="number"
               min="0" /></label
           ><label

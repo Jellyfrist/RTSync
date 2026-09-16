@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.inventory import Product, ReorderAlert, StockMovement
+from app.models.inventory import Product, ProductCategory, ReorderAlert, StockMovement, SupplierCategory, SupplierRecord
 
 
 # รายการสินค้าที่ใช้เติมฐานข้อมูลครั้งแรก
@@ -16,9 +16,32 @@ SEED_PRODUCTS = [
     {"sku": "CB-DC-6MM", "name": "สายไฟโซลาร์ DC 6mm สีดำ", "category": "อุปกรณ์ติดตั้ง", "stock": 210, "reorder_point": 100, "unit": "ม้วน", "price": 1850, "supplier": "Solar Cable Co."},
 ]
 
+SEED_SUPPLIERS = [
+    {"id": "SUP-TH-001", "name": "JA Solar Thailand", "category": "Solar Panels", "description": "ผู้จัดจำหน่ายแผงโซลาร์ JA Solar", "delivery": "2-3 วัน"},
+    {"id": "SUP-TH-012", "name": "Solar Cable Co.", "category": "Electrical & Mounting", "description": "อุปกรณ์สายไฟและงานติดตั้ง", "delivery": "3-5 วัน"},
+    {"id": "SUP-TH-019", "name": "Huawei Solar", "category": "Inverter & Monitoring", "description": "อินเวอร์เตอร์และอุปกรณ์ตรวจวัด", "delivery": "1 วัน"},
+    {"id": "SUP-TH-020", "name": "LONGi Thailand", "category": "Solar Panels", "description": "ผู้จัดจำหน่ายแผงโซลาร์ LONGi", "delivery": "2-3 วัน"},
+]
+
 
 def seed_inventory(db: Session) -> None:
-    """เติมสินค้าและแจ้งเตือนเฉพาะเมื่อฐานข้อมูลยังไม่มีสินค้า"""
+    """เติมหมวดหมู่เสมอ และเติมสินค้าเฉพาะเมื่อฐานข้อมูลยังว่าง"""
+    category_names = {item["category"] for item in SEED_PRODUCTS}
+    category_names.update(db.scalars(select(Product.category).distinct()).all())
+    existing_categories = set(db.scalars(select(ProductCategory.name)).all())
+    for name in category_names - existing_categories:
+        db.add(ProductCategory(name=name))
+    supplier_category_names = {item["category"] for item in SEED_SUPPLIERS}
+    supplier_category_names.update(db.scalars(select(SupplierRecord.category).distinct()).all())
+    existing_supplier_categories = set(db.scalars(select(SupplierCategory.name)).all())
+    for name in supplier_category_names - existing_supplier_categories:
+        db.add(SupplierCategory(name=name))
+    existing_suppliers = set(db.scalars(select(SupplierRecord.name)).all())
+    for item in SEED_SUPPLIERS:
+        if item["name"] not in existing_suppliers:
+            db.add(SupplierRecord(**item))
+    db.commit()
+
     if db.scalar(select(Product.sku).limit(1)):
         return
     for item in SEED_PRODUCTS:

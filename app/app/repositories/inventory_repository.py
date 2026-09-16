@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.inventory import Product, ReorderAlert, StockMovement
+from app.models.inventory import Product, ProductCategory, ReorderAlert, StockMovement
 from app.schemas.inventory import ProductCreate, ProductUpdate
 
 
@@ -17,6 +17,25 @@ def product_status(product: Product) -> str:
 def list_products(db: Session) -> list[Product]:
     """เรียงและคืนรายการสินค้าทั้งหมด"""
     return list(db.scalars(select(Product).order_by(Product.created_at.desc())).all())
+
+
+def list_categories(db: Session) -> list[ProductCategory]:
+    """คืนหมวดหมู่สินค้าทั้งหมดเรียงตามชื่อ"""
+    return list(db.scalars(select(ProductCategory).order_by(ProductCategory.name)).all())
+
+
+def get_category_by_name(db: Session, name: str) -> ProductCategory | None:
+    """ค้นหาหมวดหมู่จากชื่อ"""
+    return db.scalar(select(ProductCategory).where(ProductCategory.name == name))
+
+
+def save_category(db: Session, name: str) -> ProductCategory:
+    """บันทึกหมวดหมู่ใหม่"""
+    category = ProductCategory(name=name)
+    db.add(category)
+    db.commit()
+    db.refresh(category)
+    return category
 
 
 def get_product(db: Session, sku: str) -> Product | None:

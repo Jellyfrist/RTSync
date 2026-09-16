@@ -3,7 +3,7 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.repositories.inventory_repository import get_product, save_product, receive_stock
+from app.repositories.inventory_repository import get_category_by_name, get_product, save_category, save_product, receive_stock
 from app.schemas.inventory import ProductCreate, ProductUpdate
 
 
@@ -12,6 +12,14 @@ def create_product(db: Session, payload: ProductCreate):
     if get_product(db, payload.sku):
         raise HTTPException(status_code=409, detail="SKU นี้มีอยู่แล้ว")
     return save_product(db, payload)
+
+
+def create_category(db: Session, name: str):
+    """สร้างหมวดหมู่ใหม่และป้องกันชื่อซ้ำ"""
+    normalized_name = name.strip()
+    if get_category_by_name(db, normalized_name):
+        raise HTTPException(status_code=409, detail="หมวดหมู่นี้มีอยู่แล้ว")
+    return save_category(db, normalized_name)
 
 
 def update_product(db: Session, sku: str, payload: ProductUpdate):

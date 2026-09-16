@@ -27,6 +27,36 @@ class Product(Base):
     reorder_alerts: Mapped[list["ReorderAlert"]] = relationship(back_populates="product")
 
 
+class ProductCategory(Base):
+    """ตารางหมวดหมู่สินค้า เพื่อให้ผู้ใช้จัดการหมวดหมู่จากฐานข้อมูล"""
+    __tablename__ = "product_categories"
+
+    category_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SupplierCategory(Base):
+    """ตารางหมวดหมู่ซัพพลายเออร์ เพื่อให้จัดการจากฐานข้อมูลได้"""
+    __tablename__ = "supplier_categories"
+
+    category_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SupplierRecord(Base):
+    """ตารางซัพพลายเออร์สำหรับเลือกใช้กับสินค้าและการสั่งซื้อ"""
+    __tablename__ = "suppliers"
+
+    id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), unique=True, nullable=False)
+    category: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    delivery: Mapped[str] = mapped_column(String(40), nullable=False, default="ไม่ระบุ")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class StockMovement(Base):
     """ตารางประวัติรับเข้าและเบิกออกสินค้า"""
     __tablename__ = "stock_movements"

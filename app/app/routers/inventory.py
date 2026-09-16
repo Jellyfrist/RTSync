@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.repositories.inventory_repository import build_summary, list_alerts, list_movements, list_products, product_status
-from app.schemas.inventory import InventorySummary, ProductCreate, ProductOut, ProductUpdate, ReorderAlertOut, StockMovementOut, StockReceive
-from app.services.inventory_service import create_product, receive_product_stock, update_product
+from app.repositories.inventory_repository import build_summary, list_alerts, list_categories, list_movements, list_products, product_status
+from app.schemas.inventory import InventorySummary, ProductCategoryCreate, ProductCategoryOut, ProductCreate, ProductOut, ProductUpdate, ReorderAlertOut, StockMovementOut, StockReceive
+from app.services.inventory_service import create_category, create_product, receive_product_stock, update_product
 
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -31,6 +31,18 @@ def get_summary(db: Session = Depends(get_db)):
 def get_products(db: Session = Depends(get_db)):
     """ส่งรายการสินค้า"""
     return [serialize_product(product) for product in list_products(db)]
+
+
+@router.get("/categories", response_model=list[ProductCategoryOut])
+def get_categories(db: Session = Depends(get_db)):
+    """ส่งรายการหมวดหมู่สินค้าจากฐานข้อมูล"""
+    return list_categories(db)
+
+
+@router.post("/categories", response_model=ProductCategoryOut, status_code=status.HTTP_201_CREATED)
+def post_category(payload: ProductCategoryCreate, db: Session = Depends(get_db)):
+    """เพิ่มหมวดหมู่สินค้าใหม่"""
+    return create_category(db, payload.name)
 
 
 @router.post("/products", response_model=ProductOut, status_code=status.HTTP_201_CREATED)

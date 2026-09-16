@@ -24,6 +24,16 @@ class ProductUpdate(ProductBase):
     pass
 
 
+class ProductCategoryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+
+class ProductCategoryOut(ProductCategoryCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    category_id: int
+
+
 class ProductOut(ProductBase):
     model_config = ConfigDict(from_attributes=True)
 
