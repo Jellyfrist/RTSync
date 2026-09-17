@@ -344,7 +344,12 @@ function completePurchaseOrder(order) {
                     <strong>{{ supplier.contactName || "ยังไม่ระบุ" }}</strong
                     ><small class="table-subtext">{{
                       supplier.contactPhone || "ยังไม่ระบุเบอร์โทร"
-                    }}</small>
+                    }}</small
+                    ><small
+                      v-if="supplier.contactEmail"
+                      class="table-subtext"
+                      >{{ supplier.contactEmail }}</small
+                    >
                   </td>
                   <td>{{ supplier.delivery || "ยังไม่ระบุ" }}</td>
                   <td>{{ supplier.paymentTerms || "ยังไม่ระบุ" }}</td>

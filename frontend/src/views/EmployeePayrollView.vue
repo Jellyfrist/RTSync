@@ -236,8 +236,16 @@ function calculatePayroll() {
                 </td>
                 <td>
                   <strong>{{ employee.name }}</strong>
+                  <small class="table-subtext">{{
+                    employee.phone || "ยังไม่ระบุเบอร์โทร"
+                  }}</small>
                 </td>
-                <td>{{ employee.role }}</td>
+                <td>
+                  {{ employee.role }}
+                  <small class="table-subtext"
+                    >เริ่มงาน {{ employee.startDate || "ยังไม่ระบุ" }}</small
+                  >
+                </td>
                 <td class="mono">{{ money(employee.salary) }}</td>
                 <td><span class="success-tag">กำลังทำงาน</span></td>
                 <td class="employee-table-action">
@@ -270,6 +278,20 @@ function calculatePayroll() {
                       </button>
                     </div>
                     <div class="info-grid">
+                      <div>
+                        <small>เบอร์โทรศัพท์</small
+                        ><strong>{{ employee.phone || "ยังไม่ระบุ" }}</strong>
+                      </div>
+                      <div>
+                        <small>อีเมล</small
+                        ><strong>{{ employee.email || "ยังไม่ระบุ" }}</strong>
+                      </div>
+                      <div>
+                        <small>วันที่เริ่มงาน</small
+                        ><strong>{{
+                          employee.startDate || "ยังไม่ระบุ"
+                        }}</strong>
+                      </div>
                       <div>
                         <small>เงินเดือนพื้นฐาน</small
                         ><strong>{{ money(employee.salary) }}</strong>

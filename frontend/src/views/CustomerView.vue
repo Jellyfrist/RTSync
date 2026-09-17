@@ -335,6 +335,7 @@ function issueReceipt() {
               <th>ช่องทางติดต่อ</th>
               <th>ที่อยู่ / สถานที่ติดต่อ</th>
               <th>ประเภทลูกค้า</th>
+              <th>สถานะบัญชี</th>
               <th aria-label="เปิดรายละเอียด"></th>
             </tr>
           </thead>
@@ -366,6 +367,17 @@ function issueReceipt() {
                 </td>
                 <td class="supplier-description">{{ customer.location }}</td>
                 <td>{{ customer.type || "—" }}</td>
+                <td>
+                  <span
+                    :class="
+                      customer.status === 'ชำระครบถ้วน'
+                        ? 'success-tag'
+                        : 'warning-tag'
+                    "
+                  >
+                    {{ customer.status || "ยังไม่ระบุ" }}
+                  </span>
+                </td>
                 <td class="supplier-table-action">
                   <button
                     class="icon-button"
@@ -385,7 +397,7 @@ function issueReceipt() {
                 :id="`customer-detail-${customer.id}`"
                 class="supplier-detail-row"
               >
-                <td colspan="6">
+                <td colspan="7">
                   <div
                     class="detail-card supplier-inline-detail customer-inline-detail"
                   >

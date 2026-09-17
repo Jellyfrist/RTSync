@@ -284,6 +284,22 @@ const lossMakingItems = computed(() =>
   pricingAlerts.value.filter((item) => item.isLoss),
 );
 const formatCurrency = (value) => new Intl.NumberFormat("th-TH").format(value);
+const getOrderLines = (order) => [
+  ...(order.items || []),
+  ...(order.services || []),
+];
+const getOrderLineSummary = (order) => {
+  const lines = getOrderLines(order);
+  const first = lines[0];
+  if (!first) return { name: "ยังไม่มีรายการ", detail: "" };
+  return {
+    name: first.name,
+    detail:
+      lines.length > 1
+        ? `+${lines.length - 1} รายการ`
+        : `${first.qty || 0} ${first.unit || "งาน"}`,
+  };
+};
 const notify = (message) => {
   toast.value = message;
   setTimeout(() => {
@@ -821,11 +837,9 @@ function createAppointment() {
                 ><small class="table-subtext">{{ order.customerCode }}</small>
               </td>
               <td>
-                <strong>{{ order.items[0]?.name }}</strong
+                <strong>{{ getOrderLineSummary(order).name }}</strong
                 ><small class="table-subtext">{{
-                  order.items.length > 1
-                    ? `+${order.items.length - 1} รายการ`
-                    : `${order.items[0]?.qty || 0} ${order.items[0]?.unit || ""}`
+                  getOrderLineSummary(order).detail
                 }}</small>
               </td>
               <td class="mono">฿{{ formatCurrency(order.total) }}</td>
@@ -925,11 +939,9 @@ function createAppointment() {
                 ><small class="table-subtext">{{ order.customerCode }}</small>
               </td>
               <td>
-                <strong>{{ order.items[0]?.name }}</strong
+                <strong>{{ getOrderLineSummary(order).name }}</strong
                 ><small class="table-subtext">{{
-                  order.items.length > 1
-                    ? `+${order.items.length - 1} รายการ`
-                    : `${order.items[0]?.qty || 0} ${order.items[0]?.unit || ""}`
+                  getOrderLineSummary(order).detail
                 }}</small>
               </td>
               <td class="mono">฿{{ formatCurrency(order.total) }}</td>
