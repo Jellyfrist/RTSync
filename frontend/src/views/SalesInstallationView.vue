@@ -386,7 +386,7 @@ function saveSale() {
     ),
     total: total.value,
     paymentStatus: "รอชำระมัดจำ",
-    orderStatus: "รอดำเนินการ",
+    orderStatus: "รอการยืนยัน",
     createdAt: new Date().toISOString(),
   };
   salesOrders.value.unshift(sale);

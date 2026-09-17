@@ -96,12 +96,103 @@ const seed = {
 const clone = (value) => JSON.parse(JSON.stringify(value));
 let memoryDb = clone(seed);
 
+const seedCollectionKeys = {
+  categories: "category_id",
+  supplierCategories: "category_id",
+  suppliers: "id",
+  products: "sku",
+  customers: "code",
+  employees: "id",
+  sales: "id",
+  quotations: "id",
+  purchaseOrders: "id",
+  appointments: "id",
+  serviceTickets: "id",
+  fuelClaims: "id",
+  serviceTypes: "value",
+};
+
+function hydrateSeedRecords(db) {
+  Object.entries(seedCollectionKeys).forEach(([collection, key]) => {
+    const current = Array.isArray(db[collection]) ? db[collection] : [];
+    const currentKeys = new Set(
+      current.map((item) => item?.[key]).filter(Boolean),
+    );
+    const missing = (seed[collection] || []).filter(
+      (item) => !currentKeys.has(item?.[key]),
+    );
+    db[collection] = [...current, ...clone(missing)];
+  });
+}
+
+function normalizeRelations(db) {
+  const canonicalEmployees = new Map(
+    db.employees.map((item) => [item.name, item.name]),
+  );
+  const employeeAliases = { "วราภรณ์ วงศิริ": "วราภรณ์ วงศ์ศิริ" };
+  const normalizeEmployeeName = (name) => employeeAliases[name] || name;
+  const customerByName = new Map(db.customers.map((item) => [item.name, item]));
+  const supplierById = new Map(db.suppliers.map((item) => [item.id, item]));
+
+  ["appointments", "serviceTickets"].forEach((collection) => {
+    db[collection].forEach((item) => {
+      item.employees = (item.employees || []).map(normalizeEmployeeName);
+      if (item.owner && canonicalEmployees.has(item.owner))
+        item.owner = normalizeEmployeeName(item.owner);
+      const customer = customerByName.get(item.customer);
+      if (customer) item.customerCode = customer.code;
+    });
+  });
+  ["sales", "quotations"].forEach((collection) => {
+    db[collection].forEach((item) => {
+      const customer = customerByName.get(item.customer);
+      if (customer) item.customerCode = customer.code;
+      item.items = (item.items || []).map((line) => ({
+        ...line,
+        qty: Number(line.qty) || 1,
+        price: Number(line.price) || 0,
+      }));
+      item.services = (item.services || []).map((line) => ({
+        ...line,
+        qty: Number(line.qty) || 1,
+        price: Number(line.price) || 0,
+      }));
+      item.total = [...item.items, ...item.services].reduce(
+        (sum, line) => sum + line.qty * line.price,
+        0,
+      );
+    });
+  });
+  db.purchaseOrders.forEach((order) => {
+    const supplier = supplierById.get(order.supplierId);
+    if (supplier) order.supplier = supplier.name;
+    order.items = (order.items || []).map((line) => ({
+      ...line,
+      qty: Number(line.qty) || 1,
+      price: Number(line.price) || 0,
+    }));
+    order.total = order.items.reduce(
+      (sum, line) => sum + line.qty * line.price,
+      0,
+    );
+  });
+  db.fuelClaims.forEach((claim) => {
+    claim.employee = normalizeEmployeeName(claim.employee);
+    claim.amount = Number(claim.amount) || 0;
+    claim.route =
+      claim.route ||
+      [claim.routeFrom, claim.routeTo].filter(Boolean).join(" → ");
+  });
+}
+
 function readDb() {
   if (typeof localStorage === "undefined") return memoryDb;
   try {
     const stored = JSON.parse(localStorage.getItem(DB_KEY) || "null");
     if (stored && typeof stored === "object") {
       memoryDb = { ...clone(seed), ...stored };
+      hydrateSeedRecords(memoryDb);
+      normalizeRelations(memoryDb);
       // ฐาน demo รุ่นแรกอาจเคยบันทึกค่าว่างไว้ก่อนมี seed รายการสั่งซื้อ
       if (
         !Array.isArray(memoryDb.purchaseOrders) ||
