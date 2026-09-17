@@ -177,6 +177,10 @@ button,
     padding: 6px 10px 8px;
   }
 
+  .app-sidebar .sidebar-scroll {
+    display: block;
+  }
+
   .sidebar-topbar {
     height: 50px;
     justify-content: flex-start;

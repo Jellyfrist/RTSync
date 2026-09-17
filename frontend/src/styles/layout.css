@@ -8,7 +8,7 @@
 .app-content {
   flex: 1;
   min-width: 0;
-  margin-left: 256px;
+  margin-left: 224px;
   transition: margin-left 180ms ease;
 }
 .sidebar-toggle {
