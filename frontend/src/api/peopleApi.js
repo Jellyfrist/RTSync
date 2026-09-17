@@ -9,6 +9,13 @@ const normalizeEmployee = (employee) => ({
   otHours: employee.otHours ?? employee.overtime_hours,
   otRate: employee.otRate ?? employee.overtime_rate,
 });
+const normalizeSupplier = (supplier) => ({
+  ...supplier,
+  contactName: supplier.contactName ?? supplier.contact_name ?? "",
+  contactPhone: supplier.contactPhone ?? supplier.contact_phone ?? "",
+  contactEmail: supplier.contactEmail ?? supplier.contact_email ?? "",
+  paymentTerms: supplier.paymentTerms ?? supplier.payment_terms ?? "ยังไม่ระบุ",
+});
 
 export const peopleApi = {
   // ดึงรายชื่อลูกค้า
@@ -22,9 +29,9 @@ export const peopleApi = {
   // ดึงรายชื่อซัพพลายเออร์
   getSuppliers: async () => {
     try {
-      return await request("/suppliers");
+      return (await request("/suppliers")).map(normalizeSupplier);
     } catch {
-      return mockDb.get("suppliers");
+      return mockDb.get("suppliers").map(normalizeSupplier);
     }
   },
   // ดึงหมวดหมู่ซัพพลายเออร์จากฐานข้อมูล
@@ -39,11 +46,14 @@ export const peopleApi = {
   createSupplierCategory: async (name) => {
     try {
       return await request("/suppliers/categories", {
-      method: "POST",
-      body: JSON.stringify({ name }),
+        method: "POST",
+        body: JSON.stringify({ name }),
       });
     } catch {
-      const category = { category_id: `SCAT-${String(mockDb.get("supplierCategories").length + 1).padStart(3, "0")}`, name };
+      const category = {
+        category_id: `SCAT-${String(mockDb.get("supplierCategories").length + 1).padStart(3, "0")}`,
+        name,
+      };
       mockDb.insert("supplierCategories", category);
       return category;
     }
@@ -52,11 +62,15 @@ export const peopleApi = {
   createSupplier: async (supplier) => {
     try {
       return await request("/suppliers", {
-      method: "POST",
-      body: JSON.stringify(supplier),
+        method: "POST",
+        body: JSON.stringify(supplier),
       });
     } catch {
-      const record = { ...supplier, id: `SUP-TH-${String(mockDb.get("suppliers").length + 1).padStart(3, "0")}`, sku_count: 0 };
+      const record = normalizeSupplier({
+        ...supplier,
+        id: `SUP-TH-${String(mockDb.get("suppliers").length + 1).padStart(3, "0")}`,
+        sku_count: 0,
+      });
       mockDb.insert("suppliers", record);
       return record;
     }

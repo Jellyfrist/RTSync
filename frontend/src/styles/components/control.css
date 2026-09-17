@@ -8,7 +8,10 @@
   border-radius: var(--control-radius);
   background: var(--surface);
   box-shadow: 0 1px 2px rgb(15 23 42 / 3%);
-  transition: border-color var(--motion-fast), box-shadow var(--motion-fast), background var(--motion-fast);
+  transition:
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast),
+    background var(--motion-fast);
 }
 
 .control-field:hover,

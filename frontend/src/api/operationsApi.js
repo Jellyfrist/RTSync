@@ -13,15 +13,27 @@ const withFallback = (path, fallback) => async () => {
 export const operationsApi = {
   // ดึงสินค้าแนะนำสำหรับใบเสนอราคา
   getCatalog: async () => {
-    try { return await request("/operations/catalog"); } catch { return mockDb.get("catalog"); }
+    try {
+      return await request("/operations/catalog");
+    } catch {
+      return mockDb.get("catalog");
+    }
   },
   // ดึงนัดหมายติดตั้ง
   getAppointments: async () => {
-    try { return await request("/operations/appointments"); } catch { return mockDb.get("appointments"); }
+    try {
+      return await request("/operations/appointments");
+    } catch {
+      return mockDb.get("appointments");
+    }
   },
   // ดึงใบงานบริการ
   getServiceTickets: async () => {
-    try { return await request("/operations/service-tickets"); } catch { return mockDb.get("serviceTickets"); }
+    try {
+      return await request("/operations/service-tickets");
+    } catch {
+      return mockDb.get("serviceTickets");
+    }
   },
   getSales: () => Promise.resolve(mockDb.get("sales")),
   getPurchaseOrders: () => Promise.resolve(mockDb.get("purchaseOrders")),

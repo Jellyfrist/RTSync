@@ -4,7 +4,8 @@ const CustomerView = () => import("@/views/CustomerView.vue");
 const EmployeePayrollView = () => import("@/views/EmployeePayrollView.vue");
 const ProductInventoryView = () => import("@/views/ProductInventoryView.vue");
 const SalesInstallationView = () => import("@/views/SalesInstallationView.vue");
-const SupplierManagementView = () => import("@/views/SupplierManagementView.vue");
+const SupplierManagementView = () =>
+  import("@/views/SupplierManagementView.vue");
 const FuelClaimsView = () => import("@/views/FuelClaimsView.vue");
 
 const routes = [
@@ -12,9 +13,24 @@ const routes = [
   { path: "/customers", name: "customers", component: CustomerView },
   { path: "/inventory", name: "inventory", component: ProductInventoryView },
   { path: "/suppliers", name: "suppliers", component: SupplierManagementView },
-  { path: "/sales", name: "sales", component: SalesInstallationView, props: { initialTab: "sales" } },
-  { path: "/installations", name: "installations", component: SalesInstallationView, props: { initialTab: "appointments" } },
-  { path: "/service", name: "service", component: SalesInstallationView, props: { initialTab: "service" } },
+  {
+    path: "/sales",
+    name: "sales",
+    component: SalesInstallationView,
+    props: { initialTab: "sales" },
+  },
+  {
+    path: "/installations",
+    name: "installations",
+    component: SalesInstallationView,
+    props: { initialTab: "appointments" },
+  },
+  {
+    path: "/service",
+    name: "service",
+    component: SalesInstallationView,
+    props: { initialTab: "service" },
+  },
   { path: "/fuel-claims", name: "fuel-claims", component: FuelClaimsView },
   { path: "/payroll", name: "payroll", component: EmployeePayrollView },
 ];

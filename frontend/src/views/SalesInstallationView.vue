@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppPageHeader from "@/components/ui/AppPageHeader.vue";
 import AppSearchField from "@/components/ui/AppSearchField.vue";
+import AppSelect from "@/components/ui/AppSelect.vue";
 import SvgIcon from "@/components/SvgIcon.vue";
 import TablePagination from "@/components/TablePagination.vue";
 import OperationsCalendar from "@/components/OperationsCalendar.vue";
@@ -50,49 +51,57 @@ const toast = ref("");
 const showAppointmentForm = ref(false);
 const showServiceForm = ref(false);
 const showQuotationForm = ref(false);
-const employeeOptions = [
-  "ณัฐพล แสนสุข",
-  "กิตติชัย มั่นคง",
-  "วราภรณ์ วงศ์ศิริ",
-];
+const employeeOptions = ref(
+  mockDb
+    .get("employees")
+    .map((employee) => employee.name)
+    .filter(Boolean),
+);
 const employeeSearch = ref("");
 const filteredEmployeeOptions = computed(() => {
   const query = employeeSearch.value.trim().toLocaleLowerCase("th-TH");
-  if (!query) return employeeOptions;
-  return employeeOptions.filter((employee) =>
+  if (!query) return employeeOptions.value;
+  return employeeOptions.value.filter((employee) =>
     employee.toLocaleLowerCase("th-TH").includes(query),
   );
 });
-const customerOptions = [
-  "คุณสมศักดิ์ วัฒนกุล",
-  "บริษัท พลังงานไทย จำกัด",
-  "บจก. ธนทรัพย์ โลจิสติกส์",
-  "คุณกมลชนก สุขใจ",
-];
+const customerOptions = ref(
+  mockDb
+    .get("customers")
+    .map((customer) => customer.name)
+    .filter(Boolean),
+);
+const defaultEmployee = employeeOptions.value[0] || "";
+const defaultCustomer = customerOptions.value[0] || "";
+const defaultAppointmentTime = mockDb.get("appointmentTimes")[0] || "";
 const customerSearch = ref("");
 const filteredCustomerOptions = computed(() => {
   const query = customerSearch.value.trim().toLocaleLowerCase("th-TH");
-  const matches = customerOptions.filter((customer) =>
+  const matches = customerOptions.value.filter((customer) =>
     customer.toLocaleLowerCase("th-TH").includes(query),
   );
-  const selectedCustomer = newAppointment.value.customer || newTicket.value.customer;
+  const selectedCustomer =
+    quotationForm.value.customer ||
+    newAppointment.value.customer ||
+    newTicket.value.customer;
   if (selectedCustomer && !matches.includes(selectedCustomer)) {
     return [selectedCustomer, ...matches];
   }
   return matches;
 });
 const newAppointment = ref({
-  customer: "คุณสมศักดิ์ วัฒนากุล",
+  customer: defaultCustomer,
   date: "",
-  time: "09:00–12:00",
-  employees: ["ณัฐพล แสนสุข"],
+  time: defaultAppointmentTime,
+  employees: defaultEmployee ? [defaultEmployee] : [],
   type: "ติดตั้งระบบ",
 });
+const customAppointmentTime = ref("");
 // สินค้าแนะนำที่โหลดจาก API งานปฏิบัติการ
-const catalog = [];
+const catalog = ref([]);
 const bill = ref([]);
 const quotationForm = ref({
-  customer: "คุณสมศักดิ์ วัฒนกุล",
+  customer: defaultCustomer,
   quoteId: "QT-25061",
   issuedAt: new Date().toISOString().slice(0, 10),
   validUntil: "",
@@ -100,33 +109,54 @@ const quotationForm = ref({
 });
 const selectedQuoteSku = ref("");
 const selectedQuoteQty = ref(1);
+const selectedQuoteSearch = ref("");
+const quoteServices = ref([]);
+const selectedServiceKey = ref("");
+const showServiceTypeModal = ref(false);
+const newServiceType = ref({ name: "", defaultPrice: 0 });
+const serviceOptions = ref(mockDb.get("serviceTypes"));
+const selectedServicePrice = computed(
+  () =>
+    serviceOptions.value.find(
+      (service) => service.value === selectedServiceKey.value,
+    )?.defaultPrice || 0,
+);
+const filteredQuoteProducts = computed(() => {
+  const query = selectedQuoteSearch.value.trim().toLocaleLowerCase("th-TH");
+  if (!query) return catalog.value;
+  return catalog.value.filter((product) =>
+    `${product.name} ${product.sku} ${product.category || ""}`
+      .toLocaleLowerCase("th-TH")
+      .includes(query),
+  );
+});
 const salesOrders = ref([]);
 const salesSearch = ref("");
 const paymentStatusFilter = ref("ทั้งหมด");
 const orderStatusFilter = ref("ทั้งหมด");
-const paymentStatusOptions = [
-  "ทั้งหมด",
-  "ชำระเรียบร้อย",
-  "ชำระมัดจำ",
-  "รอชำระมัดจำ",
-  "รอชำระส่วนที่เหลือ",
-];
-const orderStatusOptions = [
-  "รอการยืนยัน",
-  "ยืนยันคำสั่งซื้อ",
-  "กำลังเตรียมสินค้า",
-  "จัดส่งแล้ว",
-  "ปิดการขาย",
-  "ปฏิเสธการสั่งซื้อ",
-  "ยกเลิกการขาย",
-];
+const paymentStatusOptions = mockDb.get("paymentStatuses");
+const orderStatusOptions = mockDb.get("orderStatuses");
+const appointmentTimeOptions = mockDb.get("appointmentTimes");
+const closedSalesOrders = computed(() =>
+  salesOrders.value
+    .filter((order) => order.orderStatus === "ปิดการขาย")
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)),
+);
 const filteredSalesOrders = computed(() => {
   const query = salesSearch.value.trim().toLocaleLowerCase("th-TH");
   return salesOrders.value.filter((order) => {
-    const searchable = `${order.id} ${order.customer} ${order.items.map((item) => item.name).join(" ")}`.toLocaleLowerCase("th-TH");
-    return (orderStatusFilter.value === "ทั้งหมด" || order.orderStatus === orderStatusFilter.value)
-      && (paymentStatusFilter.value === "ทั้งหมด" || order.paymentStatus === paymentStatusFilter.value)
-      && searchable.includes(query);
+    if (order.orderStatus === "ปิดการขาย") return false;
+    const searchable =
+      `${order.id} ${order.customer} ${order.items.map((item) => item.name).join(" ")}`.toLocaleLowerCase(
+        "th-TH",
+      );
+    return (
+      (orderStatusFilter.value === "ทั้งหมด" ||
+        order.orderStatus === orderStatusFilter.value) &&
+      (paymentStatusFilter.value === "ทั้งหมด" ||
+        order.paymentStatus === paymentStatusFilter.value) &&
+      searchable.includes(query)
+    );
   });
 });
 // นัดหมายและใบงานที่โหลดจาก backend
@@ -136,14 +166,17 @@ const pendingAppointments = computed(
   () => appointments.value.filter((item) => item.status !== "เสร็จสิ้น").length,
 );
 const openServiceTickets = computed(
-  () => serviceTickets.value.filter((item) => item.status !== "เสร็จสิ้น").length,
+  () =>
+    serviceTickets.value.filter((item) => item.status !== "เสร็จสิ้น").length,
 );
 const newTicket = ref({
-  customer: "คุณสมศักดิ์ วัฒนากุล",
+  customer: defaultCustomer,
   subject: "",
-  priority: "ปกติ",
-  employees: ["ณัฐพล แสนสุข"],
+  date: "",
+  time: defaultAppointmentTime,
+  employees: defaultEmployee ? [defaultEmployee] : [],
 });
+const customServiceTime = ref("");
 const sortedAppointments = computed(() =>
   [...appointments.value].sort((a, b) => new Date(a.date) - new Date(b.date)),
 );
@@ -154,22 +187,58 @@ const appointmentSearch = ref("");
 const appointmentStatusFilter = ref("ทั้งหมด");
 const serviceSearch = ref("");
 const serviceStatusFilter = ref("ทั้งหมด");
-const appointmentStatusOptions = ["ทั้งหมด", "รอยืนยัน", "ยืนยันแล้ว", "เตรียมอุปกรณ์", "กำลังติดตั้ง", "เสร็จสิ้น"];
-const serviceStatusOptions = ["ทั้งหมด", "รอเปิดงาน", "รอมอบหมาย", "นัดหมายแล้ว", "กำลังเข้าบริการ", "เสร็จสิ้น"];
+const appointmentStatusOptions = mockDb.get("appointmentStatuses");
+const serviceStatusOptions = mockDb.get("serviceStatuses");
+const servicePriorityOptions = mockDb.get("servicePriorities");
+const editStatusOptions = computed(() =>
+  editingType.value === "service"
+    ? serviceStatusOptions.slice(1)
+    : appointmentStatusOptions.slice(1),
+);
 const filteredAppointments = computed(() => {
   const query = appointmentSearch.value.trim().toLocaleLowerCase("th-TH");
   return sortedAppointments.value.filter((item) => {
-    const searchable = `${item.id} ${item.customer} ${item.site} ${item.type} ${item.employees?.join(" ") || item.crew || ""}`.toLocaleLowerCase("th-TH");
-    return (appointmentStatusFilter.value === "ทั้งหมด" || item.status === appointmentStatusFilter.value) && searchable.includes(query);
+    if (item.status === "เสร็จสิ้น" || item.closedAt) return false;
+    const searchable =
+      `${item.id} ${item.customer} ${item.site} ${item.type} ${item.employees?.join(" ") || item.crew || ""}`.toLocaleLowerCase(
+        "th-TH",
+      );
+    return (
+      (appointmentStatusFilter.value === "ทั้งหมด" ||
+        item.status === appointmentStatusFilter.value) &&
+      searchable.includes(query)
+    );
   });
 });
+const closedAppointments = computed(() =>
+  sortedAppointments.value
+    .filter((item) => item.status === "เสร็จสิ้น" || item.closedAt)
+    .sort(
+      (a, b) => new Date(b.closedAt || b.date) - new Date(a.closedAt || a.date),
+    ),
+);
 const filteredServiceTickets = computed(() => {
   const query = serviceSearch.value.trim().toLocaleLowerCase("th-TH");
   return sortedServiceTickets.value.filter((item) => {
-    const searchable = `${item.id} ${item.customer} ${item.subject} ${item.employees?.join(" ") || item.owner || ""}`.toLocaleLowerCase("th-TH");
-    return (serviceStatusFilter.value === "ทั้งหมด" || item.status === serviceStatusFilter.value) && searchable.includes(query);
+    if (item.status === "เสร็จสิ้น" || item.closedAt) return false;
+    const searchable =
+      `${item.id} ${item.customer} ${item.subject} ${item.employees?.join(" ") || item.owner || ""}`.toLocaleLowerCase(
+        "th-TH",
+      );
+    return (
+      (serviceStatusFilter.value === "ทั้งหมด" ||
+        item.status === serviceStatusFilter.value) &&
+      searchable.includes(query)
+    );
   });
 });
+const closedServiceTickets = computed(() =>
+  sortedServiceTickets.value
+    .filter((item) => item.status === "เสร็จสิ้น" || item.closedAt)
+    .sort(
+      (a, b) => new Date(b.closedAt || b.date) - new Date(a.closedAt || a.date),
+    ),
+);
 const showEditModal = ref(false);
 const editingType = ref("");
 const editingJob = ref(null);
@@ -182,29 +251,38 @@ const editForm = ref({
   priority: "ปกติ",
   status: "",
 });
+const customEditTime = ref("");
 onMounted(async () => {
   // โหลดสินค้า นัดหมาย และใบงานพร้อมกันเมื่อเปิดหน้า
-  const [catalogRecords, appointmentRecords, ticketRecords, salesRecords] = await Promise.all(
-    [
+  const [catalogRecords, appointmentRecords, ticketRecords, salesRecords] =
+    await Promise.all([
       operationsApi.getCatalog(),
       operationsApi.getAppointments(),
       operationsApi.getServiceTickets(),
       operationsApi.getSales(),
-    ],
-  );
-  catalog.splice(0, catalog.length, ...catalogRecords);
+    ]);
+  catalog.value.splice(0, catalog.value.length, ...catalogRecords);
   appointments.value = appointmentRecords;
   serviceTickets.value = ticketRecords;
   salesOrders.value = salesRecords;
 });
 const total = computed(() =>
-  bill.value.reduce((sum, item) => sum + item.price * item.qty, 0),
+  [...bill.value, ...quoteServices.value].reduce(
+    (sum, item) => sum + item.price * item.qty,
+    0,
+  ),
 );
-const pricingAlerts = computed(() => bill.value.map((item) => ({
-  ...item,
-  ...pricingDecision(item.price, item),
-})).filter((item) => item.isLoss || item.belowMinimumMargin));
-const lossMakingItems = computed(() => pricingAlerts.value.filter((item) => item.isLoss));
+const pricingAlerts = computed(() =>
+  bill.value
+    .map((item) => ({
+      ...item,
+      ...pricingDecision(item.price, item),
+    }))
+    .filter((item) => item.isLoss || item.belowMinimumMargin),
+);
+const lossMakingItems = computed(() =>
+  pricingAlerts.value.filter((item) => item.isLoss),
+);
 const formatCurrency = (value) => new Intl.NumberFormat("th-TH").format(value);
 const notify = (message) => {
   toast.value = message;
@@ -212,49 +290,100 @@ const notify = (message) => {
     toast.value = "";
   }, 2600);
 };
-function openAppointmentForm() {
+function openAppointmentForm(date = "") {
   employeeSearch.value = "";
   customerSearch.value = "";
+  if (date) newAppointment.value.date = date;
   showAppointmentForm.value = true;
 }
-function openServiceForm() {
+function openServiceForm(date = "") {
   employeeSearch.value = "";
   customerSearch.value = "";
+  if (date) newTicket.value.date = date;
   showServiceForm.value = true;
 }
 function openQuotationForm() {
+  customerSearch.value = "";
+  selectedQuoteSearch.value = "";
   showQuotationForm.value = true;
 }
 function addToBill(product) {
   // เพิ่มสินค้าเข้าใบเสนอราคา
   const item = bill.value.find((row) => row.sku === product.sku);
   if (item) item.qty += 1;
-  else bill.value.push({ ...product, qty: 1 });
+  else
+    bill.value.push({
+      ...product,
+      price: Number(product.salePrice ?? product.price) || 0,
+      qty: 1,
+    });
   notify(`เพิ่ม ${product.name} ลงใบเสนอราคาแล้ว`);
 }
 function addSelectedQuoteProduct() {
-  const product = catalog.find((item) => item.sku === selectedQuoteSku.value);
+  const product = catalog.value.find(
+    (item) => item.sku === selectedQuoteSku.value,
+  );
   if (!product) return;
   const existing = bill.value.find((item) => item.sku === product.sku);
-  if (existing) existing.qty += Math.max(Number(selectedQuoteQty.value) || 1, 1);
-  else bill.value.push({ ...product, qty: Math.max(Number(selectedQuoteQty.value) || 1, 1) });
+  if (existing)
+    existing.qty += Math.max(Number(selectedQuoteQty.value) || 1, 1);
+  else
+    bill.value.push({
+      ...product,
+      price: Number(product.salePrice ?? product.price) || 0,
+      qty: Math.max(Number(selectedQuoteQty.value) || 1, 1),
+    });
   selectedQuoteSku.value = "";
   selectedQuoteQty.value = 1;
 }
 function removeItem(index) {
   bill.value.splice(index, 1);
 }
+function addQuoteService() {
+  const service = serviceOptions.value.find(
+    (item) => item.value === selectedServiceKey.value,
+  );
+  if (!service) return;
+  const existing = quoteServices.value.find(
+    (item) => item.serviceKey === service.value,
+  );
+  if (existing) existing.qty += 1;
+  else
+    quoteServices.value.push({
+      kind: "service",
+      serviceKey: service.value,
+      sku: `SVC-${service.value.toUpperCase()}`,
+      name: service.label,
+      qty: 1,
+      unit: "งาน",
+      price: service.defaultPrice,
+    });
+  selectedServiceKey.value = "";
+}
+function removeQuoteService(index) {
+  quoteServices.value.splice(index, 1);
+}
 function saveSale() {
   if (!bill.value.length) return notify("กรุณาเลือกสินค้าอย่างน้อย 1 รายการ");
-  if (lossMakingItems.value.length) return notify("ไม่สามารถบันทึกการขายที่ราคาต่ำกว่าต้นทุนได้");
+  if (lossMakingItems.value.length)
+    return notify("ไม่สามารถบันทึกการขายที่ราคาต่ำกว่าต้นทุนได้");
   const sale = {
-    id: `SO-${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 12)}`,
+    id: `SO-${new Date()
+      .toISOString()
+      .replace(/[-:TZ.]/g, "")
+      .slice(0, 12)}`,
     customer: "คุณสมศักดิ์ วัฒนกุล",
     customerCode: "CUST-2025-001",
-    items: bill.value.map(({ sku, name, qty, unit, price, costLots, costPrice }) => ({
-      sku, name, qty, unit, price,
-      costAtSale: pricingDecision(price, { costLots, costPrice }).cost,
-    })),
+    items: bill.value.map(
+      ({ sku, name, qty, unit, price, costLots, costPrice }) => ({
+        sku,
+        name,
+        qty,
+        unit,
+        price,
+        costAtSale: pricingDecision(price, { costLots, costPrice }).cost,
+      }),
+    ),
     total: total.value,
     paymentStatus: "รอชำระมัดจำ",
     orderStatus: "รอดำเนินการ",
@@ -263,12 +392,18 @@ function saveSale() {
   salesOrders.value.unshift(sale);
   mockDb.set("sales", salesOrders.value);
   bill.value = [];
+  quoteServices.value = [];
   notify("บันทึกรายการขายแล้ว — พร้อมสร้างนัดหมายติดตั้ง");
 }
 function saveQuotation() {
-  if (!bill.value.length) return notify("กรุณาเพิ่มสินค้าอย่างน้อย 1 รายการ");
-  if (lossMakingItems.value.length) return notify("ไม่สามารถออกใบเสนอราคาที่ราคาต่ำกว่าต้นทุนได้");
-  const customerCode = `CUST-2025-${String(customerOptions.indexOf(quotationForm.value.customer) + 1).padStart(3, "0")}`;
+  if (!bill.value.length && !quoteServices.value.length)
+    return notify("กรุณาเพิ่มสินค้า หรือค่าบริการอย่างน้อย 1 รายการ");
+  if (lossMakingItems.value.length)
+    return notify("ไม่สามารถออกใบเสนอราคาที่ราคาต่ำกว่าต้นทุนได้");
+  const customer = mockDb
+    .get("customers")
+    .find((item) => item.name === quotationForm.value.customer);
+  const customerCode = customer?.code || "";
   const quotation = {
     id: quotationForm.value.quoteId,
     customer: quotationForm.value.customer,
@@ -276,26 +411,66 @@ function saveQuotation() {
     issuedAt: quotationForm.value.issuedAt,
     validUntil: quotationForm.value.validUntil,
     notes: quotationForm.value.notes,
-    items: bill.value.map(({ sku, name, qty, unit, price, costLots, costPrice }) => ({
-      sku, name, qty, unit, price,
-      costAtQuote: pricingDecision(price, { costLots, costPrice }).cost,
-    })),
+    items: bill.value.map(
+      ({ sku, name, qty, unit, price, costLots, costPrice }) => ({
+        sku,
+        name,
+        qty,
+        unit,
+        price,
+        costAtQuote: pricingDecision(price, { costLots, costPrice }).cost,
+      }),
+    ),
+    services: quoteServices.value.map(
+      ({ serviceKey, name, qty, unit, price }) => ({
+        serviceKey,
+        name,
+        qty,
+        unit,
+        price,
+      }),
+    ),
     total: total.value,
     status: "ร่างใบเสนอราคา",
   };
   const existing = mockDb.get("quotations");
-  mockDb.set("quotations", [quotation, ...existing.filter((item) => item.id !== quotation.id)]);
+  mockDb.set("quotations", [
+    quotation,
+    ...existing.filter((item) => item.id !== quotation.id),
+  ]);
   const sale = {
     ...quotation,
     paymentStatus: "รอชำระมัดจำ",
     orderStatus: "รอการยืนยัน",
     createdAt: new Date().toISOString(),
   };
-  salesOrders.value = [sale, ...salesOrders.value.filter((item) => item.id !== sale.id)];
+  salesOrders.value = [
+    sale,
+    ...salesOrders.value.filter((item) => item.id !== sale.id),
+  ];
   mockDb.set("sales", salesOrders.value);
   bill.value = [];
+  quoteServices.value = [];
   showQuotationForm.value = false;
   notify(`บันทึกใบเสนอราคา ${quotation.id} และเพิ่มในรายการขายแล้ว`);
+}
+function openServiceTypeModal() {
+  newServiceType.value = { name: "", defaultPrice: 0 };
+  showServiceTypeModal.value = true;
+}
+function saveServiceType() {
+  const name = newServiceType.value.name.trim();
+  if (!name) return;
+  const value = `custom-${Date.now()}`;
+  serviceOptions.value.push({
+    value,
+    label: name,
+    defaultPrice: Number(newServiceType.value.defaultPrice) || 0,
+  });
+  mockDb.set("serviceTypes", serviceOptions.value);
+  selectedServiceKey.value = value;
+  showServiceTypeModal.value = false;
+  notify(`เพิ่มประเภทค่าบริการ ${name} แล้ว`);
 }
 function updateSaleStatus(order) {
   mockDb.set("sales", salesOrders.value);
@@ -306,42 +481,74 @@ function updatePaymentStatus(order) {
   notify(`${order.id} เปลี่ยนสถานะการชำระเงินเป็น ${order.paymentStatus}`);
 }
 function closeSale(order) {
+  order.previousOrderStatus = order.orderStatus;
   order.orderStatus = "ปิดการขาย";
+  order.closedAt = new Date().toISOString();
   mockDb.set("sales", salesOrders.value);
   notify(`${order.id} ปิดการขายเรียบร้อยแล้ว`);
+}
+function reopenSale(order) {
+  order.orderStatus = order.previousOrderStatus || "รอการยืนยัน";
+  delete order.previousOrderStatus;
+  delete order.closedAt;
+  mockDb.set("sales", salesOrders.value);
+  notify(`${order.id} ยกเลิกการปิดการขายแล้ว`);
 }
 function cancelSale(order) {
   order.orderStatus = "ยกเลิกการขาย";
   mockDb.set("sales", salesOrders.value);
   notify(`${order.id} ยกเลิกการขายแล้ว`);
 }
-function cycleAppointment(item) {
-  // เลื่อนสถานะนัดหมายไปขั้นถัดไป
-  const flow = [
-    "รอยืนยัน",
-    "ยืนยันแล้ว",
-    "เตรียมอุปกรณ์",
-    "กำลังติดตั้ง",
-    "เสร็จสิ้น",
-  ];
-  const next = flow[(flow.indexOf(item.status) + 1) % flow.length];
-  item.status = next;
-  notify(`${item.id} เปลี่ยนสถานะเป็น ${next}`);
+function updateAppointmentStatus(item) {
+  if (item.status === "เสร็จสิ้น")
+    item.closedAt = item.closedAt || new Date().toISOString();
+  mockDb.set("appointments", appointments.value);
+  notify(`${item.id} เปลี่ยนสถานะเป็น ${item.status}`);
 }
-function cycleServiceTicket(ticket) {
-  const flow = ["รอเปิดงาน", "รอมอบหมาย", "นัดหมายแล้ว", "กำลังเข้าบริการ", "เสร็จสิ้น"];
-  const next = flow[(flow.indexOf(ticket.status) + 1) % flow.length];
-  ticket.status = next;
-  notify(`${ticket.id} เปลี่ยนสถานะเป็น ${next}`);
+function closeAppointment(item) {
+  item.previousStatus = item.status;
+  item.status = "เสร็จสิ้น";
+  item.closedAt = new Date().toISOString();
+  mockDb.set("appointments", appointments.value);
+  notify(`${item.id} ปิดงานเรียบร้อย`);
+}
+function reopenAppointment(item) {
+  item.status = item.previousStatus || "รอยืนยัน";
+  delete item.previousStatus;
+  delete item.closedAt;
+  mockDb.set("appointments", appointments.value);
+  notify(`${item.id} ยกเลิกการปิดงานแล้ว`);
+}
+function updateServiceStatus(ticket) {
+  if (ticket.status === "เสร็จสิ้น")
+    ticket.closedAt = ticket.closedAt || new Date().toISOString();
+  mockDb.set("serviceTickets", serviceTickets.value);
+  notify(`${ticket.id} เปลี่ยนสถานะเป็น ${ticket.status}`);
+}
+function closeServiceTicket(ticket) {
+  ticket.previousStatus = ticket.status;
+  ticket.status = "เสร็จสิ้น";
+  ticket.closedAt = new Date().toISOString();
+  mockDb.set("serviceTickets", serviceTickets.value);
+  notify(`${ticket.id} ปิดงานเรียบร้อย`);
+}
+function reopenServiceTicket(ticket) {
+  ticket.status = ticket.previousStatus || "รอเปิดงาน";
+  delete ticket.previousStatus;
+  delete ticket.closedAt;
+  mockDb.set("serviceTickets", serviceTickets.value);
+  notify(`${ticket.id} ยกเลิกการปิดงานแล้ว`);
 }
 function statusClass(status) {
   if (["เสร็จสิ้น", "ยืนยันแล้ว"].includes(status)) return "success-tag";
-  if (["รอยืนยัน", "รอมอบหมาย", "รอเปิดงาน"].includes(status)) return "warning-tag";
+  if (["รอยืนยัน", "รอมอบหมาย", "รอเปิดงาน"].includes(status))
+    return "warning-tag";
   return "code-tag";
 }
 function paymentStatusClass(status) {
   if (status === "ชำระเรียบร้อย") return "success-tag";
-  if (["ชำระมัดจำ", "รอชำระมัดจำ", "รอชำระส่วนที่เหลือ"].includes(status)) return "warning-tag";
+  if (["ชำระมัดจำ", "รอชำระมัดจำ", "รอชำระส่วนที่เหลือ"].includes(status))
+    return "warning-tag";
   return "code-tag";
 }
 function formatJobDate(date) {
@@ -355,11 +562,13 @@ function formatJobDate(date) {
 function openEditModal(item, type) {
   editingType.value = type;
   editingJob.value = item;
+  const isPresetTime = appointmentTimeOptions.includes(item.time);
+  customEditTime.value = isPresetTime ? "" : item.time || "";
   editForm.value = {
     customer: item.customer || "",
     subject: item.subject || "",
     date: item.date || "",
-    time: item.time || "",
+    time: isPresetTime ? item.time : "กำหนดเอง",
     site: item.site || "",
     priority: item.priority || "ปกติ",
     status: item.status || "",
@@ -368,12 +577,23 @@ function openEditModal(item, type) {
 }
 function saveEdit() {
   if (!editingJob.value) return;
+  if (editForm.value.time === "กำหนดเอง" && !customEditTime.value.trim())
+    return notify("กรุณาระบุช่วงเวลา");
+  if (editForm.value.time === "กำหนดเอง")
+    editForm.value.time = customEditTime.value.trim();
   Object.assign(editingJob.value, editForm.value);
+  if (editingType.value === "service")
+    mockDb.set("serviceTickets", serviceTickets.value);
+  if (editingType.value === "appointment")
+    mockDb.set("appointments", appointments.value);
   showEditModal.value = false;
   notify(`บันทึกรายละเอียด ${editingJob.value.id} แล้ว`);
 }
 function createTicket() {
   if (!newTicket.value.subject.trim()) return notify("กรุณาระบุหัวข้อปัญหา");
+  if (!newTicket.value.date) return notify("กรุณาเลือกวันที่เข้าบริการ");
+  if (newTicket.value.time === "กำหนดเอง" && !customServiceTime.value.trim())
+    return notify("กรุณาระบุช่วงเวลาเข้าบริการ");
   if (!newTicket.value.employees.length)
     return notify("กรุณาเลือกพนักงานอย่างน้อย 1 คน");
   serviceTickets.value.unshift({
@@ -381,13 +601,21 @@ function createTicket() {
     customer: newTicket.value.customer,
     subject: newTicket.value.subject,
     opened: "วันนี้",
-    priority: newTicket.value.priority,
+    date: newTicket.value.date,
+    time:
+      newTicket.value.time === "กำหนดเอง"
+        ? customServiceTime.value.trim()
+        : newTicket.value.time,
+    priority: "ปกติ",
     status: "รับเรื่องใหม่",
     owner: "รอมอบหมาย",
     employees: [...newTicket.value.employees],
   });
   mockDb.set("serviceTickets", serviceTickets.value);
   newTicket.value.subject = "";
+  newTicket.value.date = "";
+  newTicket.value.time = "09:00–12:00";
+  customServiceTime.value = "";
   newTicket.value.employees = ["ณัฐพล แสนสุข"];
   showServiceForm.value = false;
   notify("เปิดใบงานบริการหลังการขายแล้ว");
@@ -405,7 +633,10 @@ function createAppointment() {
     customer: newAppointment.value.customer,
     site: "รอระบุสถานที่",
     date: newAppointment.value.date,
-    time: newAppointment.value.time,
+    time:
+      newAppointment.value.time === "กำหนดเอง"
+        ? customAppointmentTime.value
+        : newAppointment.value.time,
     crew: newAppointment.value.employees.join(" · "),
     employees: [...newAppointment.value.employees],
     status: "รอยืนยัน",
@@ -426,8 +657,7 @@ function createAppointment() {
       :description="pageMeta.description"
     >
       <template #actions>
-        <div class="button-row page-actions">
-        </div>
+        <div class="button-row page-actions"></div>
       </template>
     </AppPageHeader>
     <OperationsCalendar
@@ -435,16 +665,37 @@ function createAppointment() {
       :items="appointments"
       mode="installation"
       class="top-operations-calendar"
-    ><template #detail-actions><button class="button primary full" type="button" @click="openAppointmentForm"><SvgIcon name="plus" />สร้างนัดหมาย</button></template></OperationsCalendar>
+      ><template #detail-actions="{ date }"
+        ><button
+          class="button primary full"
+          type="button"
+          @click="openAppointmentForm(date)"
+        >
+          <SvgIcon name="plus" />สร้างนัดหมาย
+        </button></template
+      ></OperationsCalendar
+    >
     <OperationsCalendar
       v-else-if="activeTab === 'service'"
       :items="serviceTickets"
       mode="service"
       class="top-operations-calendar"
-    ><template #detail-actions><button class="button primary full" type="button" @click="openServiceForm"><SvgIcon name="plus" />เพิ่มงานบริการ</button></template></OperationsCalendar>
+      ><template #detail-actions="{ date }"
+        ><button
+          class="button primary full"
+          type="button"
+          @click="openServiceForm(date)"
+        >
+          <SvgIcon name="plus" />เพิ่มงานบริการ
+        </button></template
+      ></OperationsCalendar
+    >
     <div v-if="!props.initialTab" class="section-divider">
       <span class="section-kicker">02</span>
-      <div><strong>พื้นที่ปฏิบัติงาน</strong><small>จัดการงานตามโมดูลที่เลือกจากเมนูด้านข้าง</small></div>
+      <div>
+        <strong>พื้นที่ปฏิบัติงาน</strong
+        ><small>จัดการงานตามโมดูลที่เลือกจากเมนูด้านข้าง</small>
+      </div>
     </div>
     <nav
       v-if="!props.initialTab"
@@ -470,230 +721,1079 @@ function createAppointment() {
         <span>{{ serviceTickets.length }}</span>
       </button>
     </nav>
-    <section v-if="activeTab === 'sales'" class="operations-table-section sales-orders-section">
+    <section
+      v-if="activeTab === 'sales'"
+      class="operations-table-section sales-orders-section"
+    >
       <div class="task-table-heading">
         <div>
           <h2 class="section-heading">รายการขาย</h2>
-          <p class="section-caption">รายการขายที่เกิดขึ้นจริง ติดตามสินค้า ยอดขาย และสถานะการชำระเงิน</p>
+          <p class="section-caption">
+            รายการขายที่เกิดขึ้นจริง ติดตามสินค้า ยอดขาย และสถานะการชำระเงิน
+          </p>
         </div>
         <button class="button primary" type="button" @click="openQuotationForm">
           <SvgIcon name="plus" />ออกใบเสนอราคา
         </button>
       </div>
       <div class="task-overview-grid">
-        <div><span>รายการขายทั้งหมด</span><strong>{{ filteredSalesOrders.length }}</strong><small>รายการในมุมมองนี้</small></div>
-        <div><span>รอการชำระเงิน</span><strong>{{ filteredSalesOrders.filter((order) => order.paymentStatus !== 'ชำระเรียบร้อย').length }}</strong><small>ต้องติดตามต่อ</small></div>
-        <div><span>ยอดขายรวม</span><strong>฿{{ formatCurrency(filteredSalesOrders.reduce((sum, order) => sum + order.total, 0)) }}</strong><small>จากรายการที่แสดง</small></div>
+        <div>
+          <span>รายการขายทั้งหมด</span
+          ><strong>{{ filteredSalesOrders.length }}</strong
+          ><small>รายการในมุมมองนี้</small>
+        </div>
+        <div>
+          <span>รอการชำระเงิน</span
+          ><strong>{{
+            filteredSalesOrders.filter(
+              (order) => order.paymentStatus !== "ชำระเรียบร้อย",
+            ).length
+          }}</strong
+          ><small>ต้องติดตามต่อ</small>
+        </div>
+        <div>
+          <span>ยอดขายรวม</span
+          ><strong
+            >฿{{
+              formatCurrency(
+                filteredSalesOrders.reduce(
+                  (sum, order) => sum + order.total,
+                  0,
+                ),
+              )
+            }}</strong
+          ><small>จากรายการที่แสดง</small>
+        </div>
       </div>
-      <div class="task-table-tools table-filters-below-overview sales-table-filters">
-        <AppSearchField v-model="salesSearch" class-name="table-filter-search" placeholder="ค้นหาเลขที่ขาย ชื่อลูกค้า หรือสินค้า..." label="ค้นหารายการขาย" />
-        <div class="table-filter-select control-field"><span>สถานะคำสั่งซื้อ</span><select v-model="orderStatusFilter" aria-label="กรองสถานะคำสั่งซื้อ"><option value="ทั้งหมด">ทั้งหมด</option><option v-for="status in orderStatusOptions" :key="status">{{ status }}</option></select></div>
-        <div class="table-filter-select control-field"><span>สถานะการชำระเงิน</span><select v-model="paymentStatusFilter" aria-label="กรองสถานะการชำระเงิน"><option v-for="status in paymentStatusOptions" :key="status">{{ status }}</option></select></div>
+      <div
+        class="task-table-tools table-filters-below-overview sales-table-filters"
+      >
+        <AppSearchField
+          v-model="salesSearch"
+          class-name="table-filter-search"
+          placeholder="ค้นหาเลขที่ขาย ชื่อลูกค้า หรือสินค้า..."
+          label="ค้นหารายการขาย"
+        />
+        <div class="table-filter-select control-field">
+          <span>สถานะคำสั่งซื้อ</span
+          ><select v-model="orderStatusFilter" aria-label="กรองสถานะคำสั่งซื้อ">
+            <option value="ทั้งหมด">ทั้งหมด</option>
+            <option v-for="status in orderStatusOptions" :key="status">
+              {{ status }}
+            </option>
+          </select>
+        </div>
+        <div class="table-filter-select control-field">
+          <span>สถานะการชำระเงิน</span
+          ><select
+            v-model="paymentStatusFilter"
+            aria-label="กรองสถานะการชำระเงิน"
+          >
+            <option v-for="status in paymentStatusOptions" :key="status">
+              {{ status }}
+            </option>
+          </select>
+        </div>
       </div>
       <div class="table-scroll">
         <table class="data-table operations-table sales-orders-table">
-          <thead><tr><th>เลขที่ขาย</th><th>ลูกค้า</th><th>รายการสินค้า</th><th>ยอดขาย</th><th>สถานะคำสั่งซื้อ</th><th>สถานะการชำระเงิน</th><th>จัดการ</th></tr></thead>
+          <thead>
+            <tr>
+              <th>เลขที่ขาย</th>
+              <th>ลูกค้า</th>
+              <th>รายการสินค้า</th>
+              <th>ยอดขาย</th>
+              <th>สถานะคำสั่งซื้อ</th>
+              <th>สถานะการชำระเงิน</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="order in filteredSalesOrders" :key="order.id">
-              <td><span class="sku-code">{{ order.id }}</span><small class="table-subtext">{{ new Date(order.createdAt).toLocaleDateString('th-TH') }}</small></td>
-              <td><strong>{{ order.customer }}</strong><small class="table-subtext">{{ order.customerCode }}</small></td>
-              <td><strong>{{ order.items[0]?.name }}</strong><small class="table-subtext">{{ order.items.length > 1 ? `+${order.items.length - 1} รายการ` : `${order.items[0]?.qty || 0} ${order.items[0]?.unit || ''}` }}</small></td>
+              <td>
+                <span class="sku-code">{{ order.id }}</span
+                ><small class="table-subtext">{{
+                  new Date(order.createdAt).toLocaleDateString("th-TH")
+                }}</small>
+              </td>
+              <td>
+                <strong>{{ order.customer }}</strong
+                ><small class="table-subtext">{{ order.customerCode }}</small>
+              </td>
+              <td>
+                <strong>{{ order.items[0]?.name }}</strong
+                ><small class="table-subtext">{{
+                  order.items.length > 1
+                    ? `+${order.items.length - 1} รายการ`
+                    : `${order.items[0]?.qty || 0} ${order.items[0]?.unit || ""}`
+                }}</small>
+              </td>
               <td class="mono">฿{{ formatCurrency(order.total) }}</td>
-              <td><select class="table-status-select" :class="statusClass(order.orderStatus)" v-model="order.orderStatus" aria-label="เลือกสถานะคำสั่งซื้อ" @change="updateSaleStatus(order)"><option v-for="status in orderStatusOptions" :key="status">{{ status }}</option></select></td>
-              <td><select class="table-status-select" :class="paymentStatusClass(order.paymentStatus)" v-model="order.paymentStatus" aria-label="เลือกสถานะการชำระเงิน" @change="updatePaymentStatus(order)"><option v-for="status in paymentStatusOptions.slice(1)" :key="status">{{ status }}</option></select></td>
-              <td><button v-if="order.orderStatus !== 'ปฏิเสธการสั่งซื้อ'" class="button secondary table-button sales-status-button" type="button" @click="closeSale(order)"><SvgIcon name="check" size="14" />ปิดการขาย</button><button v-else class="button secondary table-button sales-status-button" type="button" @click="cancelSale(order)"><SvgIcon name="close" size="14" />ยกเลิกการขาย</button></td>
+              <td>
+                <select
+                  class="table-status-select"
+                  :class="statusClass(order.orderStatus)"
+                  v-model="order.orderStatus"
+                  aria-label="เลือกสถานะคำสั่งซื้อ"
+                  @change="updateSaleStatus(order)"
+                >
+                  <option v-for="status in orderStatusOptions" :key="status">
+                    {{ status }}
+                  </option>
+                </select>
+              </td>
+              <td>
+                <select
+                  class="table-status-select"
+                  :class="paymentStatusClass(order.paymentStatus)"
+                  v-model="order.paymentStatus"
+                  aria-label="เลือกสถานะการชำระเงิน"
+                  @change="updatePaymentStatus(order)"
+                >
+                  <option
+                    v-for="status in paymentStatusOptions.slice(1)"
+                    :key="status"
+                  >
+                    {{ status }}
+                  </option>
+                </select>
+              </td>
+              <td>
+                <button
+                  v-if="order.orderStatus !== 'ปฏิเสธการสั่งซื้อ'"
+                  class="button secondary table-button sales-status-button"
+                  type="button"
+                  @click="closeSale(order)"
+                >
+                  <SvgIcon name="check" size="14" />ปิดการขาย</button
+                ><button
+                  v-else
+                  class="button secondary table-button sales-status-button"
+                  type="button"
+                  @click="cancelSale(order)"
+                >
+                  <SvgIcon name="close" size="14" />ยกเลิกการขาย
+                </button>
+              </td>
             </tr>
-            <tr v-if="!filteredSalesOrders.length"><td colspan="7" class="empty-state">ยังไม่มีรายการขายที่ตรงกับตัวกรอง</td></tr>
+            <tr v-if="!filteredSalesOrders.length">
+              <td colspan="7" class="empty-state">
+                ยังไม่มีรายการขายที่ตรงกับตัวกรอง
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
       <TablePagination :total="filteredSalesOrders.length" label="รายการขาย" />
     </section>
-    <div v-if="activeTab === 'sales' && showQuotationForm" class="modal-backdrop" @click.self="showQuotationForm = false">
+    <section
+      v-if="activeTab === 'sales'"
+      class="operations-table-section sales-closed-section"
+    >
+      <div class="task-table-heading">
+        <div>
+          <h2 class="section-heading">รายการขายที่ปิดแล้ว</h2>
+          <p class="section-caption">
+            ประวัติการขายที่ดำเนินการเสร็จสิ้นแล้ว สำหรับตรวจสอบย้อนหลัง
+          </p>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table operations-table sales-orders-table">
+          <thead>
+            <tr>
+              <th>เลขที่ขาย</th>
+              <th>ลูกค้า</th>
+              <th>รายการสินค้า</th>
+              <th>ยอดขาย</th>
+              <th>สถานะคำสั่งซื้อ</th>
+              <th>สถานะการชำระเงิน</th>
+              <th>ปิดการขายเมื่อ</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="order in closedSalesOrders" :key="order.id">
+              <td>
+                <span class="sku-code">{{ order.id }}</span
+                ><small class="table-subtext">{{
+                  new Date(order.createdAt).toLocaleDateString("th-TH")
+                }}</small>
+              </td>
+              <td>
+                <strong>{{ order.customer }}</strong
+                ><small class="table-subtext">{{ order.customerCode }}</small>
+              </td>
+              <td>
+                <strong>{{ order.items[0]?.name }}</strong
+                ><small class="table-subtext">{{
+                  order.items.length > 1
+                    ? `+${order.items.length - 1} รายการ`
+                    : `${order.items[0]?.qty || 0} ${order.items[0]?.unit || ""}`
+                }}</small>
+              </td>
+              <td class="mono">฿{{ formatCurrency(order.total) }}</td>
+              <td><span class="success-tag">ปิดการขาย</span></td>
+              <td>
+                <span :class="paymentStatusClass(order.paymentStatus)">{{
+                  order.paymentStatus
+                }}</span>
+              </td>
+              <td>
+                {{
+                  new Date(
+                    order.closedAt || order.createdAt,
+                  ).toLocaleDateString("th-TH")
+                }}
+              </td>
+              <td>
+                <button
+                  class="button secondary table-button sales-status-button"
+                  type="button"
+                  title="ยกเลิกการปิดการขาย"
+                  @click="reopenSale(order)"
+                >
+                  <SvgIcon name="refresh" size="14" />ยกเลิกการปิดการขาย
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!closedSalesOrders.length">
+              <td colspan="8" class="empty-state">
+                ยังไม่มีรายการขายที่ปิดแล้ว
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <TablePagination
+        :total="closedSalesOrders.length"
+        label="รายการขายที่ปิดแล้ว"
+      />
+    </section>
+    <div
+      v-if="activeTab === 'sales' && showQuotationForm"
+      class="modal-backdrop"
+      @click.self="showQuotationForm = false"
+    >
       <form class="modal quotation-modal" @submit.prevent="saveQuotation">
         <div class="modal-heading">
           <div>
+            <span class="eyebrow">QUOTATION FORM</span>
             <h2>ออกใบเสนอราคา</h2>
-            <p class="modal-caption">เลือกสินค้าและจัดทำใบเสนอราคาก่อนเปลี่ยนเป็นรายการขาย</p>
+            <p class="modal-caption">
+              เลือกสินค้าและจัดทำใบเสนอราคาก่อนเปลี่ยนเป็นรายการขาย
+            </p>
           </div>
-          <button type="button" class="icon-button" title="ปิด" aria-label="ปิดฟอร์มออกใบเสนอราคา" @click="showQuotationForm = false">
+          <button
+            type="button"
+            class="icon-button"
+            title="ปิด"
+            aria-label="ปิดฟอร์มออกใบเสนอราคา"
+            @click="showQuotationForm = false"
+          >
             <SvgIcon name="close" />
           </button>
         </div>
         <div class="quotation-form">
-        <div class="form-grid">
-          <label>ลูกค้า<select v-model="quotationForm.customer" required><option v-for="customer in customerOptions" :key="customer">{{ customer }}</option></select></label>
-          <label>เลขที่ใบเสนอราคา<input v-model="quotationForm.quoteId" required /></label>
-          <label>วันที่ออกใบเสนอราคา<input v-model="quotationForm.issuedAt" type="date" required /></label>
-          <label>วันหมดอายุ<input v-model="quotationForm.validUntil" type="date" /></label>
-        </div>
-        <label>หมายเหตุเพิ่มเติม<textarea v-model="quotationForm.notes" rows="3" placeholder="รายละเอียดเงื่อนไขการเสนอราคา หรือหมายเหตุถึงลูกค้า"></textarea></label>
-        <div class="quotation-items-section">
-          <div class="quotation-items-heading"><div><h3>รายการสินค้าในใบเสนอราคา</h3><p>เลือกสินค้าและระบุจำนวนที่ต้องการเสนอให้ลูกค้า</p></div></div>
-          <div class="quotation-item-picker">
-            <label>สินค้า<select v-model="selectedQuoteSku"><option value="">เลือกสินค้าจากคลัง</option><option v-for="product in catalog" :key="product.sku" :value="product.sku">{{ product.name }} · {{ product.sku }} · ฿{{ formatCurrency(product.price) }}</option></select></label>
-            <label>จำนวน<input v-model.number="selectedQuoteQty" type="number" min="1" /></label>
-            <button type="button" class="button secondary" :disabled="!selectedQuoteSku" @click="addSelectedQuoteProduct"><SvgIcon name="plus" />เพิ่มรายการ</button>
+          <div class="form-grid">
+            <label
+              >ลูกค้า<AppSelect
+                v-model="quotationForm.customer"
+                :options="customerOptions"
+                placeholder="เลือกลูกค้า"
+                search-placeholder="ค้นหาชื่อลูกค้า..."
+                aria-label="เลือกลูกค้าสำหรับใบเสนอราคา"
+                required
+            /></label>
+            <label
+              >เลขที่ใบเสนอราคา<input v-model="quotationForm.quoteId" required
+            /></label>
+            <label
+              >วันที่ออกใบเสนอราคา<input
+                v-model="quotationForm.issuedAt"
+                type="date"
+                required
+            /></label>
+            <label
+              >วันหมดอายุ<input v-model="quotationForm.validUntil" type="date"
+            /></label>
           </div>
-          <div class="table-scroll">
-            <table class="data-table">
-              <thead><tr><th>รายการ</th><th>จำนวน</th><th>ราคา</th><th>รวม</th><th></th></tr></thead>
-              <tbody>
-                <tr v-for="(item, index) in bill" :key="item.sku"><td><strong>{{ item.name }}</strong><small class="table-subtext">{{ item.sku }}</small></td><td>{{ item.qty }} {{ item.unit }}</td><td>฿{{ formatCurrency(item.price) }}<small class="table-subtext pricing-meta">ต้นทุน ฿{{ formatCurrency(pricingDecision(item.price, item).cost) }} · กำไร {{ Math.round(pricingDecision(item.price, item).marginRate * 100) }}%</small></td><td>฿{{ formatCurrency(item.price * item.qty) }}</td><td><button type="button" class="icon-button" title="ลบรายการ" @click="removeItem(index)"><SvgIcon name="close" /></button></td></tr>
-                <tr v-if="!bill.length"><td colspan="5" class="empty-state">ยังไม่มีรายการสินค้า กรุณาเลือกสินค้าด้านบน</td></tr>
-              </tbody>
-            </table>
+          <label
+            >หมายเหตุเพิ่มเติม<textarea
+              v-model="quotationForm.notes"
+              rows="3"
+              placeholder="รายละเอียดเงื่อนไขการเสนอราคา หรือหมายเหตุถึงลูกค้า"
+            ></textarea>
+          </label>
+          <div class="quotation-items-section">
+            <div class="quotation-items-heading">
+              <div>
+                <h3>รายการสินค้าในใบเสนอราคา</h3>
+                <p>เลือกสินค้าและระบุจำนวนที่ต้องการเสนอให้ลูกค้า</p>
+              </div>
+            </div>
+            <div class="quotation-item-picker">
+              <label
+                >สินค้า<AppSelect
+                  v-model="selectedQuoteSku"
+                  :options="
+                    filteredQuoteProducts.map((product) => ({
+                      value: product.sku,
+                      label: `${product.name} · ${product.sku} · ฿${formatCurrency(product.price)}`,
+                    }))
+                  "
+                  placeholder="เลือกสินค้าจากคลัง"
+                  search-placeholder="ค้นหาชื่อสินค้า หรือ SKU..."
+                  aria-label="เลือกสินค้าสำหรับใบเสนอราคา"
+              /></label>
+              <label
+                >จำนวน<input
+                  v-model.number="selectedQuoteQty"
+                  type="number"
+                  min="1"
+              /></label>
+              <button
+                type="button"
+                class="button secondary"
+                :disabled="!selectedQuoteSku"
+                @click="addSelectedQuoteProduct"
+              >
+                <SvgIcon name="plus" />เพิ่มรายการ
+              </button>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>รายการ</th>
+                    <th>จำนวน</th>
+                    <th>ราคาที่เสนอ / หน่วย</th>
+                    <th>รวม</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(item, index) in bill" :key="item.sku">
+                    <td>
+                      <strong>{{ item.name }}</strong
+                      ><small class="table-subtext">{{ item.sku }}</small>
+                    </td>
+                    <td>{{ item.qty }} {{ item.unit }}</td>
+                    <td>
+                      <input
+                        v-model.number="item.price"
+                        class="quotation-price-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        :aria-label="`ราคาที่เสนอสำหรับ ${item.name}`"
+                      /><small class="table-subtext pricing-meta"
+                        >ต้นทุน ฿{{
+                          formatCurrency(pricingDecision(item.price, item).cost)
+                        }}
+                        · กำไร
+                        {{
+                          Math.round(
+                            pricingDecision(item.price, item).marginRate * 100,
+                          )
+                        }}%</small
+                      >
+                    </td>
+                    <td>฿{{ formatCurrency(item.price * item.qty) }}</td>
+                    <td>
+                      <button
+                        type="button"
+                        class="icon-button"
+                        title="ลบรายการ"
+                        @click="removeItem(index)"
+                      >
+                        <SvgIcon name="close" />
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="!bill.length">
+                    <td colspan="5" class="empty-state">
+                      ยังไม่มีรายการสินค้า กรุณาเลือกสินค้าด้านบน
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <TablePagination :total="bill.length" label="รายการในใบเสนอราคา" />
           </div>
-          <TablePagination :total="bill.length" label="รายการในใบเสนอราคา" />
-        </div>
-        <div v-if="pricingAlerts.length" class="form-helper pricing-warning" role="alert">
-          <strong>ตรวจสอบกำไร</strong>
-          <span v-for="item in pricingAlerts" :key="item.sku">{{ item.name }}: ต้นทุนเฉลี่ย ฿{{ formatCurrency(item.cost) }} · แนะนำราคาขายอย่างน้อย ฿{{ formatCurrency(item.recommendedPrice) }}</span>
-        </div>
-        <div class="order-total"><span>ยอดรวมทั้งสิ้น</span><strong>฿{{ formatCurrency(total) }}</strong></div>
-          <div class="button-row end"><button type="button" class="button secondary" @click="bill = []">ล้างฟอร์ม</button><button class="button primary" type="submit"><SvgIcon name="check" />บันทึกใบเสนอราคา</button></div>
+          <div class="quotation-items-section quotation-services-section">
+            <div class="quotation-items-heading">
+              <div>
+                <h3>ค่าบริการ</h3>
+                <p>
+                  เพิ่มค่าติดตั้ง ค่าบริการหลังการขาย หรือค่าใช้จ่ายประกอบการขาย
+                </p>
+              </div>
+            </div>
+            <div class="quotation-item-picker">
+              <label
+                >ประเภทค่าบริการ<AppSelect
+                  v-model="selectedServiceKey"
+                  :options="serviceOptions"
+                  placeholder="เลือกค่าบริการ"
+                  aria-label="เลือกประเภทค่าบริการ"
+                >
+                  <template #menu-footer>
+                    <button
+                      type="button"
+                      class="app-select-add-action"
+                      @click.stop="openServiceTypeModal"
+                    >
+                      <SvgIcon name="plus" size="15" />เพิ่มประเภทค่าบริการ
+                    </button>
+                  </template>
+                </AppSelect></label
+              >
+              <label
+                >ราคา / หน่วย<input
+                  :value="selectedServicePrice"
+                  type="number"
+                  readonly
+                  aria-label="ราคาตั้งต้นของค่าบริการ"
+              /></label>
+              <button
+                type="button"
+                class="button secondary"
+                :disabled="!selectedServiceKey"
+                @click="addQuoteService"
+              >
+                <SvgIcon name="plus" />เพิ่มค่าบริการ
+              </button>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>รายการ</th>
+                    <th>จำนวน</th>
+                    <th>ราคา / หน่วย</th>
+                    <th>รวม</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="(service, index) in quoteServices"
+                    :key="service.serviceKey"
+                  >
+                    <td>
+                      <strong>{{ service.name }}</strong
+                      ><small class="table-subtext">ค่าบริการ</small>
+                    </td>
+                    <td>{{ service.qty }} {{ service.unit }}</td>
+                    <td>
+                      <input
+                        v-model.number="service.price"
+                        class="quotation-price-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        :aria-label="`ราคาค่าบริการ ${service.name}`"
+                      />
+                    </td>
+                    <td>฿{{ formatCurrency(service.price * service.qty) }}</td>
+                    <td>
+                      <button
+                        type="button"
+                        class="icon-button"
+                        title="ลบค่าบริการ"
+                        @click="removeQuoteService(index)"
+                      >
+                        <SvgIcon name="close" />
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="!quoteServices.length">
+                    <td colspan="5" class="empty-state">
+                      ยังไม่มีค่าบริการ เพิ่มได้จากรายการด้านบน
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <TablePagination
+              :total="quoteServices.length"
+              label="รายการค่าบริการ"
+            />
+          </div>
+          <div
+            v-if="pricingAlerts.length"
+            class="form-helper pricing-warning"
+            role="alert"
+          >
+            <strong>ตรวจสอบกำไร</strong>
+            <span v-for="item in pricingAlerts" :key="item.sku"
+              >{{ item.name }}: ต้นทุนเฉลี่ย ฿{{ formatCurrency(item.cost) }} ·
+              แนะนำราคาขายอย่างน้อย ฿{{
+                formatCurrency(item.recommendedPrice)
+              }}</span
+            >
+          </div>
+          <div class="order-total">
+            <span>ยอดรวมทั้งสิ้น</span
+            ><strong>฿{{ formatCurrency(total) }}</strong>
+          </div>
+          <div class="button-row end">
+            <button
+              type="button"
+              class="button secondary"
+              @click="
+                bill = [];
+                quoteServices = [];
+              "
+            >
+              ล้างฟอร์ม</button
+            ><button class="button primary" type="submit">
+              <SvgIcon name="check" />บันทึกใบเสนอราคา
+            </button>
+          </div>
         </div>
       </form>
     </div>
     <div
       v-if="activeTab === 'appointments' && showAppointmentForm"
-        class="modal-backdrop"
-        @click.self="showAppointmentForm = false"
+      class="modal-backdrop"
+      @click.self="showAppointmentForm = false"
+    >
+      <form
+        class="modal product-form-modal"
+        @submit.prevent="createAppointment"
       >
-        <form class="modal" @submit.prevent="createAppointment">
-          <div class="modal-heading">
+        <div class="modal-heading">
+          <div>
+            <span class="eyebrow">INSTALLATION APPOINTMENT</span>
             <h2>สร้างนัดหมายติดตั้ง</h2>
-            <button
-              type="button"
-              class="icon-button"
-              title="ปิด"
-              @click="showAppointmentForm = false"
+          </div>
+          <button
+            type="button"
+            class="icon-button"
+            title="ปิด"
+            @click="showAppointmentForm = false"
+          >
+            <SvgIcon name="close" />
+          </button>
+        </div>
+        <p class="modal-description">
+          กำหนดลูกค้า วันเวลา และทีมช่างสำหรับงานติดตั้งครั้งนี้
+        </p>
+        <label
+          >ลูกค้า
+          <AppSelect
+            v-model="newAppointment.customer"
+            :options="customerOptions"
+            placeholder="เลือกลูกค้า"
+            search-placeholder="ค้นหาชื่อลูกค้า..."
+            aria-label="เลือกลูกค้าสำหรับนัดหมายติดตั้ง"
+            required /></label
+        ><label
+          >วันที่นัดหมาย<input
+            v-model="newAppointment.date"
+            type="date"
+            required /></label
+        ><label
+          >ช่วงเวลา<AppSelect
+            v-model="newAppointment.time"
+            :options="appointmentTimeOptions"
+            placeholder="เลือกช่วงเวลา"
+            aria-label="เลือกช่วงเวลานัดหมาย" /></label
+        ><label v-if="newAppointment.time === 'กำหนดเอง'"
+          >กรอกช่วงเวลาเอง<input
+            v-model="customAppointmentTime"
+            placeholder="เช่น 09:00–12:00"
+            required
+        /></label>
+        <fieldset class="assignment-fieldset">
+          <legend>พนักงานที่ส่งไปติดตั้ง</legend>
+          <div class="assignment-search">
+            <SvgIcon name="search" size="16" />
+            <input
+              v-model="employeeSearch"
+              type="search"
+              aria-label="ค้นหาพนักงานที่จะส่งไปติดตั้ง"
+              placeholder="ค้นหาชื่อพนักงาน..."
+            />
+          </div>
+          <div class="assignment-summary">
+            <span>เลือกผู้ปฏิบัติงานได้มากกว่า 1 คน</span
+            ><strong>{{ newAppointment.employees.length }} คน</strong>
+          </div>
+          <div
+            v-if="newAppointment.employees.length"
+            class="assignment-selected-list"
+            aria-label="พนักงานที่เลือก"
+          >
+            <span
+              v-for="employee in newAppointment.employees"
+              :key="`selected-install-${employee}`"
+              >{{ employee }}</span
             >
-              <SvgIcon name="close" />
-            </button>
           </div>
           <label
-            >ลูกค้า<div class="assignment-search">
-              <SvgIcon name="search" size="16" />
-              <input v-model="customerSearch" type="search" aria-label="ค้นหาลูกค้าสำหรับนัดหมายติดตั้ง" placeholder="ค้นหาชื่อลูกค้า..." />
-            </div>
-            <select v-model="newAppointment.customer" required>
-              <option v-for="customer in filteredCustomerOptions" :key="customer" :value="customer">{{ customer }}</option>
-            </select></label
-          ><label
-            >วันที่นัดหมาย<input
-              v-model="newAppointment.date"
-              type="date"
-              required /></label
-          ><label
-            >ช่วงเวลา<select v-model="newAppointment.time">
-              <option>09:00–12:00</option>
-              <option>13:00–16:00</option>
-              <option>09:00–15:00</option>
-            </select></label
-          ><fieldset class="assignment-fieldset">
-            <legend>พนักงานที่ส่งไปติดตั้ง</legend>
-            <div class="assignment-search">
-              <SvgIcon name="search" size="16" />
-              <input
-                v-model="employeeSearch"
-                type="search"
-                aria-label="ค้นหาพนักงานที่จะส่งไปติดตั้ง"
-                placeholder="ค้นหาชื่อพนักงาน..."
-              />
-            </div>
-            <p class="field-helper">เลือกได้มากกว่า 1 คน</p>
-            <label v-for="employee in filteredEmployeeOptions" :key="employee" class="assignment-option">
-              <input v-model="newAppointment.employees" type="checkbox" :value="employee" />
-              <span>{{ employee }}</span>
-            </label>
-            <p v-if="!filteredEmployeeOptions.length" class="assignment-empty">ไม่พบพนักงานที่ค้นหา</p>
-          </fieldset>
-          <div class="button-row end">
-            <button
-              type="button"
-              class="button secondary"
-              @click="showAppointmentForm = false"
-            >
-              ยกเลิก</button
-            ><button class="button primary" type="submit">บันทึกนัดหมาย</button>
-          </div>
-        </form>
+            v-for="employee in filteredEmployeeOptions"
+            :key="employee"
+            class="assignment-option"
+          >
+            <input
+              v-model="newAppointment.employees"
+              type="checkbox"
+              :value="employee"
+            />
+            <span>{{ employee }}</span>
+          </label>
+          <p v-if="!filteredEmployeeOptions.length" class="assignment-empty">
+            ไม่พบพนักงานที่ค้นหา
+          </p>
+        </fieldset>
+        <div class="button-row end">
+          <button
+            type="button"
+            class="button secondary"
+            @click="showAppointmentForm = false"
+          >
+            ยกเลิก</button
+          ><button class="button primary" type="submit">บันทึกนัดหมาย</button>
+        </div>
+      </form>
     </div>
-    <section v-if="activeTab === 'appointments'" class="operations-table-section">
+    <section
+      v-if="activeTab === 'appointments'"
+      class="operations-table-section"
+    >
       <div class="task-table-heading">
         <div>
           <h2 class="section-heading">งานติดตั้งทั้งหมด</h2>
-          <p class="section-caption">เรียงจากกำหนดงานที่ใกล้ที่สุด เพื่อให้ทีมวางแผนหน้างานได้ทันเวลา</p>
+          <p class="section-caption">
+            เรียงจากกำหนดงานที่ใกล้ที่สุด เพื่อให้ทีมวางแผนหน้างานได้ทันเวลา
+          </p>
         </div>
-        <button class="button primary" type="button" @click="openAppointmentForm">
+        <button
+          class="button primary"
+          type="button"
+          @click="openAppointmentForm"
+        >
           <SvgIcon name="plus" />สร้างนัดหมาย
         </button>
       </div>
       <div class="task-overview-grid">
-        <div><span>งานทั้งหมด</span><strong>{{ filteredAppointments.length }}</strong><small>งานในมุมมองนี้</small></div>
-        <div><span>งานวันนี้</span><strong>{{ sortedAppointments.filter((item) => item.date === new Date().toISOString().slice(0, 10)).length }}</strong><small>ต้องเตรียมความพร้อม</small></div>
-        <div><span>ใกล้ถึงกำหนด</span><strong>{{ sortedAppointments[0] ? formatJobDate(sortedAppointments[0].date) : '—' }}</strong><small>รายการแรกในคิว</small></div>
+        <div>
+          <span>งานทั้งหมด</span
+          ><strong>{{ filteredAppointments.length }}</strong
+          ><small>งานในมุมมองนี้</small>
+        </div>
+        <div>
+          <span>งานวันนี้</span
+          ><strong>{{
+            sortedAppointments.filter(
+              (item) => item.date === new Date().toISOString().slice(0, 10),
+            ).length
+          }}</strong
+          ><small>ต้องเตรียมความพร้อม</small>
+        </div>
+        <div>
+          <span>ใกล้ถึงกำหนด</span
+          ><strong>{{
+            sortedAppointments[0]
+              ? formatJobDate(sortedAppointments[0].date)
+              : "—"
+          }}</strong
+          ><small>รายการแรกในคิว</small>
+        </div>
       </div>
       <div class="task-table-tools table-filters-below-overview">
-        <AppSearchField v-model="appointmentSearch" class-name="table-filter-search" placeholder="ค้นหาเลขที่งาน ลูกค้า หรือพนักงาน..." label="ค้นหางานติดตั้ง" />
-        <div class="table-filter-select control-field"><span>สถานะ</span><select v-model="appointmentStatusFilter" aria-label="กรองสถานะงานติดตั้ง"><option v-for="status in appointmentStatusOptions" :key="status">{{ status }}</option></select></div>
+        <AppSearchField
+          v-model="appointmentSearch"
+          class-name="table-filter-search"
+          placeholder="ค้นหาเลขที่งาน ลูกค้า หรือพนักงาน..."
+          label="ค้นหางานติดตั้ง"
+        />
+        <div class="table-filter-select control-field">
+          <span>สถานะ</span
+          ><select
+            v-model="appointmentStatusFilter"
+            aria-label="กรองสถานะงานติดตั้ง"
+          >
+            <option v-for="status in appointmentStatusOptions" :key="status">
+              {{ status }}
+            </option>
+          </select>
+        </div>
       </div>
       <div class="table-scroll">
         <table class="data-table operations-table">
-          <thead><tr><th>เลขที่งาน</th><th>ลูกค้า / สถานที่</th><th>กำหนดงาน</th><th>พนักงาน</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+          <thead>
+            <tr>
+              <th>เลขที่งาน</th>
+              <th>ลูกค้า / สถานที่</th>
+              <th>กำหนดงาน</th>
+              <th>พนักงาน</th>
+              <th>สถานะ</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="item in filteredAppointments" :key="item.id">
-              <td><span class="sku-code">{{ item.id }}</span><small class="table-subtext">{{ item.type }}</small></td>
-              <td><strong>{{ item.customer }}</strong><small class="table-subtext">{{ item.site }}</small></td>
-              <td><strong>{{ formatJobDate(item.date) }}</strong><small class="table-subtext">{{ item.time }}</small></td>
-              <td>{{ item.employees?.join(' · ') || item.crew }}</td>
-              <td><span :class="statusClass(item.status)">{{ item.status }}</span></td>
-              <td><div class="table-actions"><button class="button secondary table-button table-icon-button" title="แก้ไขรายละเอียดงาน" aria-label="แก้ไขรายละเอียดงาน" @click="openEditModal(item, 'appointment')"><SvgIcon name="edit" size="15" /></button><button class="button status-action table-button" title="อัพเดตสถานะงาน" aria-label="อัพเดตสถานะงาน" @click="cycleAppointment(item)"><SvgIcon name="refresh" size="15" /><span>สถานะ</span></button></div></td>
+              <td>
+                <span class="sku-code">{{ item.id }}</span
+                ><small class="table-subtext">{{ item.type }}</small>
+              </td>
+              <td>
+                <strong>{{ item.customer }}</strong
+                ><small class="table-subtext">{{ item.site }}</small>
+              </td>
+              <td>
+                <strong>{{ formatJobDate(item.date) }}</strong
+                ><small class="table-subtext">{{ item.time }}</small>
+              </td>
+              <td>{{ item.employees?.join(" · ") || item.crew }}</td>
+              <td>
+                <select
+                  class="table-status-select"
+                  :class="statusClass(item.status)"
+                  v-model="item.status"
+                  aria-label="เลือกสถานะงานติดตั้ง"
+                  @change="updateAppointmentStatus(item)"
+                >
+                  <option
+                    v-for="status in appointmentStatusOptions.slice(1, -1)"
+                    :key="status"
+                  >
+                    {{ status }}
+                  </option>
+                  <option>เสร็จสิ้น</option>
+                </select>
+              </td>
+              <td>
+                <div class="table-actions">
+                  <button
+                    class="button secondary table-button table-icon-button"
+                    title="แก้ไขรายละเอียดงาน"
+                    aria-label="แก้ไขรายละเอียดงาน"
+                    @click="openEditModal(item, 'appointment')"
+                  >
+                    <SvgIcon name="edit" size="15" /></button
+                  ><button
+                    class="button secondary table-button close-job-button"
+                    title="ปิดงาน"
+                    aria-label="ปิดงาน"
+                    @click="closeAppointment(item)"
+                  >
+                    <SvgIcon name="check" size="15" /><span>ปิดงาน</span>
+                  </button>
+                </div>
+              </td>
             </tr>
-            <tr v-if="!filteredAppointments.length"><td colspan="6" class="empty-state">ไม่พบงานติดตั้งที่ตรงกับตัวกรอง</td></tr>
+            <tr v-if="!filteredAppointments.length">
+              <td colspan="6" class="empty-state">
+                ไม่พบงานติดตั้งที่ตรงกับตัวกรอง
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
-      <TablePagination :total="filteredAppointments.length" label="งานติดตั้ง" />
+      <TablePagination
+        :total="filteredAppointments.length"
+        label="งานติดตั้ง"
+      />
+    </section>
+    <section
+      v-if="activeTab === 'appointments'"
+      class="operations-table-section completed-jobs-section"
+    >
+      <div class="task-table-heading">
+        <div>
+          <h2 class="section-heading">งานที่ปิดแล้ว</h2>
+          <p class="section-caption">
+            ประวัติงานติดตั้งที่ทีมดำเนินการเสร็จสิ้นแล้ว
+          </p>
+        </div>
+        <span class="completed-jobs-count"
+          >{{ closedAppointments.length }} งาน</span
+        >
+      </div>
+      <div class="table-scroll">
+        <table class="data-table operations-table">
+          <thead>
+            <tr>
+              <th>เลขที่งาน</th>
+              <th>ลูกค้า / สถานที่</th>
+              <th>กำหนดงาน</th>
+              <th>พนักงาน</th>
+              <th>สถานะ</th>
+              <th>ปิดงานเมื่อ</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in closedAppointments" :key="`closed-${item.id}`">
+              <td>
+                <span class="sku-code">{{ item.id }}</span
+                ><small class="table-subtext">{{ item.type }}</small>
+              </td>
+              <td>
+                <strong>{{ item.customer }}</strong
+                ><small class="table-subtext">{{ item.site }}</small>
+              </td>
+              <td>
+                <strong>{{ formatJobDate(item.date) }}</strong
+                ><small class="table-subtext">{{ item.time }}</small>
+              </td>
+              <td>{{ item.employees?.join(" · ") || item.crew }}</td>
+              <td>
+                <span :class="statusClass(item.status)">{{ item.status }}</span>
+              </td>
+              <td>
+                {{
+                  item.closedAt
+                    ? new Date(item.closedAt).toLocaleDateString("th-TH")
+                    : formatJobDate(item.date)
+                }}
+              </td>
+              <td>
+                <button
+                  class="button secondary table-button close-job-button"
+                  type="button"
+                  title="ยกเลิกการปิดงาน"
+                  @click="reopenAppointment(item)"
+                >
+                  <SvgIcon name="refresh" size="14" /><span
+                    >ยกเลิกการปิดงาน</span
+                  >
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!closedAppointments.length">
+              <td colspan="7" class="empty-state">
+                ยังไม่มีงานติดตั้งที่ปิดแล้ว
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <TablePagination
+        :total="closedAppointments.length"
+        label="งานที่ปิดแล้ว"
+      />
     </section>
     <section v-if="activeTab === 'service'" class="operations-service">
       <div class="operations-table-section">
         <div class="task-table-heading">
           <div>
             <h2 class="section-heading">งานบริการหลังการขายทั้งหมด</h2>
-            <p class="section-caption">เรียงจากกำหนดเข้าบริการที่ใกล้ที่สุด เพื่อไม่ให้พลาดงานสำคัญ</p>
+            <p class="section-caption">
+              เรียงจากกำหนดเข้าบริการที่ใกล้ที่สุด เพื่อไม่ให้พลาดงานสำคัญ
+            </p>
           </div>
           <button class="button primary" type="button" @click="openServiceForm">
             <SvgIcon name="plus" />เพิ่มงานบริการ
           </button>
         </div>
         <div class="task-overview-grid">
-          <div><span>งานทั้งหมด</span><strong>{{ filteredServiceTickets.length }}</strong><small>งานในมุมมองนี้</small></div>
-          <div><span>งานเร่งด่วน</span><strong>{{ sortedServiceTickets.filter((item) => item.priority === 'สูง' || item.priority === 'เร่งด่วน').length }}</strong><small>ต้องติดตามเป็นพิเศษ</small></div>
-          <div><span>ใกล้ถึงกำหนด</span><strong>{{ sortedServiceTickets[0] ? formatJobDate(sortedServiceTickets[0].date) : '—' }}</strong><small>รายการแรกในคิว</small></div>
+          <div>
+            <span>งานทั้งหมด</span
+            ><strong>{{ filteredServiceTickets.length }}</strong
+            ><small>งานในมุมมองนี้</small>
+          </div>
+          <div>
+            <span>งานเร่งด่วน</span
+            ><strong>{{
+              sortedServiceTickets.filter(
+                (item) =>
+                  item.priority === "สูง" || item.priority === "เร่งด่วน",
+              ).length
+            }}</strong
+            ><small>ต้องติดตามเป็นพิเศษ</small>
+          </div>
+          <div>
+            <span>ใกล้ถึงกำหนด</span
+            ><strong>{{
+              sortedServiceTickets[0]
+                ? formatJobDate(sortedServiceTickets[0].date)
+                : "—"
+            }}</strong
+            ><small>รายการแรกในคิว</small>
+          </div>
         </div>
         <div class="task-table-tools table-filters-below-overview">
-          <AppSearchField v-model="serviceSearch" class-name="table-filter-search" placeholder="ค้นหาเลขที่งาน ลูกค้า หรือพนักงาน..." label="ค้นหางานบริการหลังการขาย" />
-          <div class="table-filter-select control-field"><span>สถานะ</span><select v-model="serviceStatusFilter" aria-label="กรองสถานะงานบริการหลังการขาย"><option v-for="status in serviceStatusOptions" :key="status">{{ status }}</option></select></div>
+          <AppSearchField
+            v-model="serviceSearch"
+            class-name="table-filter-search"
+            placeholder="ค้นหาเลขที่งาน ลูกค้า หรือพนักงาน..."
+            label="ค้นหางานบริการหลังการขาย"
+          />
+          <div class="table-filter-select control-field">
+            <span>สถานะ</span
+            ><select
+              v-model="serviceStatusFilter"
+              aria-label="กรองสถานะงานบริการหลังการขาย"
+            >
+              <option v-for="status in serviceStatusOptions" :key="status">
+                {{ status }}
+              </option>
+            </select>
+          </div>
         </div>
         <div class="table-scroll">
           <table class="data-table operations-table">
-            <thead><tr><th>เลขที่ใบงาน</th><th>ลูกค้า / รายละเอียด</th><th>กำหนดเข้าบริการ</th><th>พนักงาน</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+            <thead>
+              <tr>
+                <th>เลขที่ใบงาน</th>
+                <th>ลูกค้า / รายละเอียด</th>
+                <th>กำหนดเข้าบริการ</th>
+                <th>พนักงาน</th>
+                <th>สถานะ</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
             <tbody>
               <tr v-for="ticket in filteredServiceTickets" :key="ticket.id">
-                <td><span class="sku-code">{{ ticket.id }}</span><small class="table-subtext">เปิด {{ ticket.opened }}</small></td>
-                <td><strong>{{ ticket.customer }}</strong><small class="table-subtext">{{ ticket.subject }}</small></td>
-                <td><strong>{{ formatJobDate(ticket.date) }}</strong><small class="table-subtext">{{ ticket.time }}</small></td>
-                <td>{{ ticket.employees?.join(' · ') || ticket.owner }}</td>
-                <td><span :class="statusClass(ticket.status)">{{ ticket.status }}</span></td>
-                <td><div class="table-actions"><button class="button secondary table-button table-icon-button" title="แก้ไขรายละเอียดใบงาน" aria-label="แก้ไขรายละเอียดใบงาน" @click="openEditModal(ticket, 'service')"><SvgIcon name="edit" size="15" /></button><button class="button status-action table-button" title="อัพเดตสถานะใบงาน" aria-label="อัพเดตสถานะใบงาน" @click="cycleServiceTicket(ticket)"><SvgIcon name="refresh" size="15" /><span>สถานะ</span></button></div></td>
+                <td>
+                  <span class="sku-code">{{ ticket.id }}</span
+                  ><small class="table-subtext">เปิด {{ ticket.opened }}</small>
+                </td>
+                <td>
+                  <strong>{{ ticket.customer }}</strong
+                  ><small class="table-subtext">{{ ticket.subject }}</small>
+                </td>
+                <td>
+                  <strong>{{ formatJobDate(ticket.date) }}</strong
+                  ><small class="table-subtext">{{ ticket.time }}</small>
+                </td>
+                <td>{{ ticket.employees?.join(" · ") || ticket.owner }}</td>
+                <td>
+                  <select
+                    class="table-status-select"
+                    :class="statusClass(ticket.status)"
+                    v-model="ticket.status"
+                    aria-label="เลือกสถานะงานบริการหลังการขาย"
+                    @change="updateServiceStatus(ticket)"
+                  >
+                    <option
+                      v-for="status in serviceStatusOptions.slice(1, -1)"
+                      :key="status"
+                    >
+                      {{ status }}
+                    </option>
+                    <option>เสร็จสิ้น</option>
+                  </select>
+                </td>
+                <td>
+                  <div class="table-actions">
+                    <button
+                      class="button secondary table-button table-icon-button"
+                      title="แก้ไขรายละเอียดใบงาน"
+                      aria-label="แก้ไขรายละเอียดใบงาน"
+                      @click="openEditModal(ticket, 'service')"
+                    >
+                      <SvgIcon name="edit" size="15" /></button
+                    ><button
+                      class="button secondary table-button close-job-button"
+                      title="ปิดงาน"
+                      aria-label="ปิดงาน"
+                      @click="closeServiceTicket(ticket)"
+                    >
+                      <SvgIcon name="check" size="15" /><span>ปิดงาน</span>
+                    </button>
+                  </div>
+                </td>
               </tr>
-              <tr v-if="!filteredServiceTickets.length"><td colspan="6" class="empty-state">ไม่พบใบงานบริการที่ตรงกับตัวกรอง</td></tr>
+              <tr v-if="!filteredServiceTickets.length">
+                <td colspan="6" class="empty-state">
+                  ไม่พบใบงานบริการที่ตรงกับตัวกรอง
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
-        <TablePagination :total="filteredServiceTickets.length" label="ใบงานบริการ" />
+        <TablePagination
+          :total="filteredServiceTickets.length"
+          label="ใบงานบริการ"
+        />
+      </div>
+      <div class="operations-table-section completed-jobs-section">
+        <div class="task-table-heading">
+          <div>
+            <h2 class="section-heading">งานบริการที่ปิดแล้ว</h2>
+            <p class="section-caption">
+              ประวัติงานบริการหลังการขายที่ทีมดำเนินการเสร็จสิ้นแล้ว
+            </p>
+          </div>
+          <span class="completed-jobs-count"
+            >{{ closedServiceTickets.length }} งาน</span
+          >
+        </div>
+        <div class="table-scroll">
+          <table class="data-table operations-table">
+            <thead>
+              <tr>
+                <th>เลขที่ใบงาน</th>
+                <th>ลูกค้า / รายละเอียด</th>
+                <th>กำหนดเข้าบริการ</th>
+                <th>พนักงาน</th>
+                <th>สถานะ</th>
+                <th>ปิดงานเมื่อ</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="ticket in closedServiceTickets"
+                :key="`closed-${ticket.id}`"
+              >
+                <td>
+                  <span class="sku-code">{{ ticket.id }}</span
+                  ><small class="table-subtext">เปิด {{ ticket.opened }}</small>
+                </td>
+                <td>
+                  <strong>{{ ticket.customer }}</strong
+                  ><small class="table-subtext">{{ ticket.subject }}</small>
+                </td>
+                <td>
+                  <strong>{{ formatJobDate(ticket.date) }}</strong
+                  ><small class="table-subtext">{{ ticket.time }}</small>
+                </td>
+                <td>{{ ticket.employees?.join(" · ") || ticket.owner }}</td>
+                <td>
+                  <span :class="statusClass(ticket.status)">{{
+                    ticket.status
+                  }}</span>
+                </td>
+                <td>
+                  {{
+                    ticket.closedAt
+                      ? new Date(ticket.closedAt).toLocaleDateString("th-TH")
+                      : formatJobDate(ticket.date)
+                  }}
+                </td>
+                <td>
+                  <button
+                    class="button secondary table-button close-job-button"
+                    type="button"
+                    title="ยกเลิกการปิดงาน"
+                    @click="reopenServiceTicket(ticket)"
+                  >
+                    <SvgIcon name="refresh" size="14" /><span
+                      >ยกเลิกการปิดงาน</span
+                    >
+                  </button>
+                </td>
+              </tr>
+              <tr v-if="!closedServiceTickets.length">
+                <td colspan="7" class="empty-state">
+                  ยังไม่มีงานบริการที่ปิดแล้ว
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <TablePagination
+          :total="closedServiceTickets.length"
+          label="งานบริการที่ปิดแล้ว"
+        />
       </div>
       <div
         v-if="showServiceForm"
@@ -715,27 +1815,40 @@ function createAppointment() {
               <SvgIcon name="close" />
             </button>
           </div>
-          <p class="modal-description">บันทึกข้อมูลปัญหาและนัดหมายเพื่อส่งต่องานให้ทีมบริการ</p>
+          <p class="modal-description">
+            บันทึกข้อมูลปัญหาและนัดหมายเพื่อส่งต่องานให้ทีมบริการ
+          </p>
           <label
-            >ลูกค้า<div class="assignment-search">
-              <SvgIcon name="search" size="16" />
-              <input v-model="customerSearch" type="search" aria-label="ค้นหาลูกค้าสำหรับใบงานบริการ" placeholder="ค้นหาชื่อลูกค้า..." />
-            </div>
-            <select v-model="newTicket.customer" required>
-              <option v-for="customer in filteredCustomerOptions" :key="customer" :value="customer">{{ customer }}</option>
-            </select></label
+            >ลูกค้า
+            <AppSelect
+              v-model="newTicket.customer"
+              :options="customerOptions"
+              placeholder="เลือกลูกค้า"
+              search-placeholder="ค้นหาชื่อลูกค้า..."
+              aria-label="เลือกลูกค้าสำหรับใบงานบริการ"
+              required /></label
           ><label
             >หัวข้อปัญหา<input
               v-model="newTicket.subject"
               placeholder="เช่น อินเวอร์เตอร์มี Error Code"
               required /></label
           ><label
-            >ระดับความสำคัญ<select v-model="newTicket.priority">
-              <option>ปกติ</option>
-              <option>สูง</option>
-              <option>เร่งด่วน</option>
-            </select></label
-          >
+            >วันที่เข้าบริการ<input
+              v-model="newTicket.date"
+              type="date"
+              required /></label
+          ><label
+            >ช่วงเวลาเข้าบริการ<AppSelect
+              v-model="newTicket.time"
+              :options="appointmentTimeOptions"
+              placeholder="เลือกช่วงเวลา"
+              aria-label="เลือกช่วงเวลาเข้าบริการ" /></label
+          ><label v-if="newTicket.time === 'กำหนดเอง'"
+            >กรอกช่วงเวลาเอง<input
+              v-model="customServiceTime"
+              placeholder="เช่น 09:00–12:00"
+              required
+          /></label>
           <fieldset class="assignment-fieldset">
             <legend>พนักงานที่ส่งไปบริการ</legend>
             <div class="assignment-search">
@@ -747,19 +1860,45 @@ function createAppointment() {
                 placeholder="ค้นหาชื่อพนักงาน..."
               />
             </div>
-            <p class="field-helper">เลือกได้มากกว่า 1 คน</p>
-            <label v-for="employee in filteredEmployeeOptions" :key="employee" class="assignment-option">
-              <input v-model="newTicket.employees" type="checkbox" :value="employee" />
+            <div class="assignment-summary">
+              <span>เลือกผู้ปฏิบัติงานได้มากกว่า 1 คน</span
+              ><strong>{{ newTicket.employees.length }} คน</strong>
+            </div>
+            <div
+              v-if="newTicket.employees.length"
+              class="assignment-selected-list"
+              aria-label="พนักงานที่เลือก"
+            >
+              <span
+                v-for="employee in newTicket.employees"
+                :key="`selected-service-${employee}`"
+                >{{ employee }}</span
+              >
+            </div>
+            <label
+              v-for="employee in filteredEmployeeOptions"
+              :key="employee"
+              class="assignment-option"
+            >
+              <input
+                v-model="newTicket.employees"
+                type="checkbox"
+                :value="employee"
+              />
               <span>{{ employee }}</span>
             </label>
-            <p v-if="!filteredEmployeeOptions.length" class="assignment-empty">ไม่พบพนักงานที่ค้นหา</p>
+            <p v-if="!filteredEmployeeOptions.length" class="assignment-empty">
+              ไม่พบพนักงานที่ค้นหา
+            </p>
           </fieldset>
           <div class="button-row end">
             <button
               type="button"
               class="button secondary"
               @click="showServiceForm = false"
-            >ยกเลิก</button>
+            >
+              ยกเลิก
+            </button>
             <button class="button primary" type="submit">
               <SvgIcon name="check" />บันทึกใบงาน
             </button>
@@ -767,40 +1906,128 @@ function createAppointment() {
         </form>
       </div>
     </section>
-    <div v-if="showEditModal" class="modal-backdrop" @click.self="showEditModal = false">
+    <div
+      v-if="showServiceTypeModal"
+      class="modal-backdrop"
+      @click.self="showServiceTypeModal = false"
+    >
+      <form class="modal service-type-modal" @submit.prevent="saveServiceType">
+        <div class="modal-heading">
+          <div>
+            <span class="eyebrow">SERVICE TYPE</span>
+            <h2>เพิ่มประเภทค่าบริการ</h2>
+          </div>
+          <button
+            type="button"
+            class="icon-button"
+            title="ปิด"
+            @click="showServiceTypeModal = false"
+          >
+            <SvgIcon name="close" />
+          </button>
+        </div>
+        <p class="modal-description">
+          เพิ่มประเภทใหม่สำหรับใช้ในใบเสนอราคา พร้อมกำหนดราคาตั้งต้นได้
+        </p>
+        <label
+          >ชื่อประเภทค่าบริการ<input
+            v-model="newServiceType.name"
+            required
+            placeholder="เช่น ค่าตรวจหน้างาน"
+        /></label>
+        <label
+          >ราคาตั้งต้น / หน่วย<input
+            v-model.number="newServiceType.defaultPrice"
+            type="number"
+            min="0"
+            step="1"
+            placeholder="0"
+        /></label>
+        <div class="button-row end">
+          <button
+            type="button"
+            class="button secondary"
+            @click="showServiceTypeModal = false"
+          >
+            ยกเลิก
+          </button>
+          <button type="submit" class="button primary">
+            <SvgIcon name="check" />เพิ่มประเภทค่าบริการ
+          </button>
+        </div>
+      </form>
+    </div>
+    <div
+      v-if="showEditModal"
+      class="modal-backdrop"
+      @click.self="showEditModal = false"
+    >
       <form class="modal task-edit-modal" @submit.prevent="saveEdit">
         <div class="modal-heading">
           <div>
             <span class="eyebrow">EDIT WORK ITEM</span>
             <h2>แก้ไขรายละเอียดงาน</h2>
           </div>
-          <button type="button" class="icon-button" title="ปิด" @click="showEditModal = false">
+          <button
+            type="button"
+            class="icon-button"
+            title="ปิด"
+            @click="showEditModal = false"
+          >
             <SvgIcon name="close" />
           </button>
         </div>
-        <p class="modal-description">แก้ไขข้อมูลสำคัญของงาน และอัพเดตสถานะให้ทีมเห็นความคืบหน้าล่าสุด</p>
+        <p class="modal-description">
+          แก้ไขข้อมูลสำคัญของงาน และอัพเดตสถานะให้ทีมเห็นความคืบหน้าล่าสุด
+        </p>
         <label>ลูกค้า<input v-model="editForm.customer" required /></label>
-        <label v-if="editingType === 'appointment'">สถานที่ปฏิบัติงาน<input v-model="editForm.site" required /></label>
-        <label v-else>รายละเอียดปัญหา<input v-model="editForm.subject" required /></label>
+        <label v-if="editingType === 'appointment'"
+          >สถานที่ปฏิบัติงาน<input v-model="editForm.site" required
+        /></label>
+        <label v-else
+          >รายละเอียดปัญหา<input v-model="editForm.subject" required
+        /></label>
         <div class="form-grid two">
-          <label>วันที่กำหนด<input v-model="editForm.date" type="date" required /></label>
-          <label>ช่วงเวลา<input v-model="editForm.time" placeholder="เช่น 09:00–12:00" required /></label>
+          <label
+            >วันที่กำหนด<input v-model="editForm.date" type="date" required
+          /></label>
+          <label
+            >ช่วงเวลา<AppSelect
+              v-model="editForm.time"
+              :options="appointmentTimeOptions"
+              placeholder="เลือกช่วงเวลา"
+              aria-label="เลือกช่วงเวลางาน"
+          /></label>
+          <label v-if="editForm.time === 'กำหนดเอง'"
+            >กรอกช่วงเวลาเอง<input
+              v-model="customEditTime"
+              placeholder="เช่น 09:00–12:00"
+              required
+          /></label>
         </div>
-        <label v-if="editingType === 'service'">ความสำคัญ<select v-model="editForm.priority"><option>ปกติ</option><option>สูง</option><option>เร่งด่วน</option></select></label>
-        <label>สถานะงาน<select v-model="editForm.status">
-          <option v-if="editingType === 'appointment'">รอยืนยัน</option>
-          <option v-if="editingType === 'appointment'">ยืนยันแล้ว</option>
-          <option v-if="editingType === 'appointment'">เตรียมอุปกรณ์</option>
-          <option v-if="editingType === 'appointment'">กำลังติดตั้ง</option>
-          <option v-if="editingType === 'service'">รอเปิดงาน</option>
-          <option v-if="editingType === 'service'">รอมอบหมาย</option>
-          <option v-if="editingType === 'service'">นัดหมายแล้ว</option>
-          <option v-if="editingType === 'service'">กำลังเข้าบริการ</option>
-          <option>เสร็จสิ้น</option>
-        </select></label>
+        <label v-if="editingType === 'service'"
+          >ความสำคัญ<AppSelect
+            v-model="editForm.priority"
+            :options="servicePriorityOptions"
+            aria-label="เลือกระดับความสำคัญของงาน"
+        /></label>
+        <label
+          >สถานะงาน<AppSelect
+            v-model="editForm.status"
+            :options="editStatusOptions"
+            aria-label="เลือกสถานะงาน"
+        /></label>
         <div class="button-row end">
-          <button type="button" class="button secondary" @click="showEditModal = false">ยกเลิก</button>
-          <button type="submit" class="button primary"><SvgIcon name="check" />บันทึกการแก้ไข</button>
+          <button
+            type="button"
+            class="button secondary"
+            @click="showEditModal = false"
+          >
+            ยกเลิก
+          </button>
+          <button type="submit" class="button primary">
+            <SvgIcon name="check" />บันทึกการแก้ไข
+          </button>
         </div>
       </form>
     </div>

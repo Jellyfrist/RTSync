@@ -5,11 +5,12 @@ import AppHeader from "./AppHeader.vue";
 import AppSidebar from "./AppSidebar.vue";
 import AppFooter from "./AppFooter.vue";
 
-defineProps({
-});
+defineProps({});
 
 // สถานะการยุบหรือขยาย sidebar ของทั้ง layout
-const sidebarCollapsed = ref(localStorage.getItem("rtsync.sidebarCollapsed") === "true");
+const sidebarCollapsed = ref(
+  localStorage.getItem("rtsync.sidebarCollapsed") === "true",
+);
 watch(sidebarCollapsed, (collapsed) => {
   localStorage.setItem("rtsync.sidebarCollapsed", String(collapsed));
 });
@@ -22,8 +23,7 @@ watch(sidebarCollapsed, (collapsed) => {
       @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed"
     />
     <div class="app-content">
-      <AppHeader
-      />
+      <AppHeader />
       <main class="page-content"><slot /></main>
       <AppFooter />
     </div>

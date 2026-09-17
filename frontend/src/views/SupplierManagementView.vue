@@ -5,6 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppPageHeader from "@/components/ui/AppPageHeader.vue";
 import AppSearchField from "@/components/ui/AppSearchField.vue";
+import AppSelect from "@/components/ui/AppSelect.vue";
 import SvgIcon from "@/components/SvgIcon.vue";
 import TablePagination from "@/components/TablePagination.vue";
 import { useModal } from "@/composables/useModal";
@@ -28,20 +29,27 @@ const form = ref({
   name: "",
   category: "",
   description: "",
+  contactName: "",
+  contactPhone: "",
+  contactEmail: "",
   delivery: "2-3 วัน",
+  paymentTerms: "เครดิต 30 วัน",
 });
 // รายการสินค้าจาก API คลังที่ใช้แสดงการผูกซัพพลายเออร์
 const products = ref([]);
 const purchaseOrders = ref([]);
-const showPurchaseHistory = ref(false);
 const showSupplierCategoryFilter = ref(false);
 const supplierCategoryFilter = ref("ทั้งหมด");
 const supplierCategoryFilterQuery = ref("");
-const purchaseOrderStatuses = ["รอดำเนินการ", "กำลังจัดซื้อ", "สั่งซื้อแล้ว", "สำเร็จ"];
+const purchaseOrderStatuses = mockDb.get("purchaseOrderStatuses");
 const visibleSuppliers = computed(() =>
-  suppliers.value.filter((item) =>
-    `${item.name} ${item.category}`.toLowerCase().includes(filter.value.toLowerCase())
-    && (supplierCategoryFilter.value === "ทั้งหมด" || item.category === supplierCategoryFilter.value),
+  suppliers.value.filter(
+    (item) =>
+      `${item.name} ${item.category} ${item.contactName} ${item.contactPhone}`
+        .toLowerCase()
+        .includes(filter.value.toLowerCase()) &&
+      (supplierCategoryFilter.value === "ทั้งหมด" ||
+        item.category === supplierCategoryFilter.value),
   ),
 );
 const filteredSupplierCategories = computed(() => {
@@ -74,12 +82,13 @@ async function loadSupplierCategories() {
 }
 onMounted(async () => {
   // โหลดซัพพลายเออร์และสินค้าเมื่อเปิดหน้า
-  const [supplierRecords, inventoryRecords, purchaseOrderRecords] = await Promise.all([
-    peopleApi.getSuppliers(),
-    inventoryApi.getProducts(),
-    operationsApi.getPurchaseOrders(),
-    loadSupplierCategories(),
-  ]);
+  const [supplierRecords, inventoryRecords, purchaseOrderRecords] =
+    await Promise.all([
+      peopleApi.getSuppliers(),
+      inventoryApi.getProducts(),
+      operationsApi.getPurchaseOrders(),
+      loadSupplierCategories(),
+    ]);
   suppliers.value = supplierRecords.map((item) => ({
     ...item,
     sku: item.sku_count,
@@ -95,14 +104,20 @@ onMounted(async () => {
     supplierId: supplierIds[item.supplier] || "",
     reorderPoint: item.reorderPoint,
   }));
-  purchaseOrders.value = purchaseOrderRecords?.length ? purchaseOrderRecords : mockDb.get("purchaseOrders");
+  purchaseOrders.value = purchaseOrderRecords?.length
+    ? purchaseOrderRecords
+    : mockDb.get("purchaseOrders");
 });
 function resetForm() {
   form.value = {
     name: "",
     category: supplierCategories.value[0]?.name || "",
     description: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
     delivery: "2-3 วัน",
+    paymentTerms: "เครดิต 30 วัน",
   };
   editingSupplier.value = null;
 }
@@ -173,14 +188,19 @@ function selectSupplierCategory(category) {
   showSupplierCategoryFilter.value = false;
 }
 function orderStatusClass(status) {
-  if (status === "สำเร็จ") return "success-tag";
-  if (status === "รอดำเนินการ") return "warning-tag";
+  if (["รับของเรียบร้อยแล้ว", "สำเร็จ"].includes(status)) return "success-tag";
+  if (["รอดำเนินการ", "รอของมาส่ง"].includes(status)) return "warning-tag";
   return "code-tag";
 }
-function advancePurchaseOrder(order) {
-  const currentIndex = purchaseOrderStatuses.indexOf(order.status);
-  order.status = purchaseOrderStatuses[Math.min(currentIndex + 1, purchaseOrderStatuses.length - 1)];
+function updatePurchaseOrderStatus(order) {
   mockDb.set("purchaseOrders", purchaseOrders.value);
+  notify(`อัปเดต ${order.id} เป็น ${order.status} แล้ว`);
+}
+function completePurchaseOrder(order) {
+  order.status = "สำเร็จ";
+  order.completedAt = new Date().toISOString();
+  mockDb.set("purchaseOrders", purchaseOrders.value);
+  notify(`${order.id} รับของเรียบร้อยและปิดรายการสำเร็จแล้ว`);
 }
 </script>
 
@@ -192,269 +212,428 @@ function advancePurchaseOrder(order) {
       description="Suppliers & Sourcing Hub"
     />
     <div class="supplier-page">
-    <section class="operations-table-section supplier-workspace">
-      <div class="task-table-heading">
-        <div>
-          <h2 class="section-heading">ภาพรวมคู่ค้า</h2>
-          <p class="section-caption">ค้นหา เลือกคู่ค้า และจัดการรายการสินค้าที่เกี่ยวข้อง</p>
-        </div>
-        <button class="button primary" @click="openAdd">
-          <SvgIcon name="plus" />เพิ่มซัพพลายเออร์
-        </button>
-      </div>
-      <div class="task-overview-grid supplier-overview-grid">
-        <div><span>ซัพพลายเออร์ทั้งหมด</span><strong>{{ suppliers.length }} <small>ราย</small></strong><small>พร้อมใช้กับการจัดซื้อ</small></div>
-        <div><span>หมวดหมู่คู่ค้า</span><strong>{{ supplierCategories.length }} <small>หมวด</small></strong><small>จัดการจากฐานข้อมูล</small></div>
-        <div><span>สินค้าที่ผูกแล้ว</span><strong>{{ linkedProductCount }} <small>SKU</small></strong><small>กำหนดแหล่งจัดซื้อแล้ว</small></div>
-      </div>
-      <div class="task-table-tools table-filters-below-overview supplier-table-toolbar">
-        <AppSearchField
-          v-model="filter"
-          class-name="table-filter-search"
-          placeholder="ค้นหาซัพพลายเออร์"
-          label="ค้นหาซัพพลายเออร์"
-        />
-        <div class="category-picker supplier-category-filter">
-          <button
-            type="button"
-            class="category-picker-trigger control-field"
-            :aria-expanded="showSupplierCategoryFilter"
-            aria-controls="supplier-category-options"
-            @click="showSupplierCategoryFilter = !showSupplierCategoryFilter"
-          >
-            <span>หมวดหมู่</span><strong>{{ supplierCategoryFilter }}</strong><SvgIcon class="supplier-category-chevron" name="chevron-right" size="16" />
+      <section class="operations-table-section supplier-workspace">
+        <div class="task-table-heading">
+          <div>
+            <h2 class="section-heading">ภาพรวมคู่ค้า</h2>
+            <p class="section-caption">
+              ค้นหา เลือกคู่ค้า และจัดการรายการสินค้าที่เกี่ยวข้อง
+            </p>
+          </div>
+          <button class="button primary" @click="openAdd">
+            <SvgIcon name="plus" />เพิ่มซัพพลายเออร์
           </button>
-          <div v-if="showSupplierCategoryFilter" id="supplier-category-options" class="category-picker-menu">
-            <AppSearchField
-              v-model="supplierCategoryFilterQuery"
-              class-name="category-picker-search"
-              placeholder="ค้นหาหมวดหมู่"
-              label="ค้นหาหมวดหมู่ซัพพลายเออร์"
-            />
-            <div class="category-option-list">
-              <button
-                type="button"
-                :class="{ selected: supplierCategoryFilter === 'ทั้งหมด' }"
-                @click="selectSupplierCategory('ทั้งหมด')"
-              >ทั้งหมด</button>
-              <button
-                v-for="category in filteredSupplierCategories"
-                :key="category.category_id || category.name"
-                type="button"
-                :class="{ selected: supplierCategoryFilter === category.name }"
-                @click="selectSupplierCategory(category.name)"
-              >{{ category.name }}</button>
-              <p v-if="!filteredSupplierCategories.length" class="category-empty">ไม่พบหมวดหมู่ที่ค้นหา</p>
-            </div>
+        </div>
+        <div class="task-overview-grid supplier-overview-grid">
+          <div>
+            <span>ซัพพลายเออร์ทั้งหมด</span
+            ><strong>{{ suppliers.length }} <small>ราย</small></strong
+            ><small>พร้อมใช้กับการจัดซื้อ</small>
+          </div>
+          <div>
+            <span>หมวดหมู่คู่ค้า</span
+            ><strong>{{ supplierCategories.length }} <small>หมวด</small></strong
+            ><small>จัดการจากฐานข้อมูล</small>
+          </div>
+          <div>
+            <span>สินค้าที่ผูกแล้ว</span
+            ><strong>{{ linkedProductCount }} <small>SKU</small></strong
+            ><small>กำหนดแหล่งจัดซื้อแล้ว</small>
           </div>
         </div>
-      <p class="supplier-workspace-hint">
-        เลือกซัพพลายเออร์เพื่อเปิดรายละเอียดและจัดการรายการสินค้าที่เกี่ยวข้อง
-      </p>
-      </div>
-      <div class="table-scroll supplier-directory-table-wrap">
-        <table class="data-table supplier-directory-table">
-          <thead>
-            <tr>
-              <th>ซัพพลายเออร์</th>
-              <th>หมวดหมู่</th>
-              <th>รายละเอียด</th>
-              <th>ระยะเวลาจัดส่ง</th>
-              <th>SKU</th>
-              <th aria-label="เปิดรายละเอียด"></th>
-            </tr>
-          </thead>
-          <tbody>
-        <template
-          v-for="supplier in visibleSuppliers"
-          :key="supplier.id"
+        <div
+          class="task-table-tools table-filters-below-overview supplier-table-toolbar"
         >
-          <tr
-            class="supplier-table-row"
-            :class="{ selected: selectedId === supplier.id }"
-            :aria-expanded="selectedId === supplier.id"
-            tabindex="0"
-            @click="toggleSupplier(supplier.id)"
-            @keydown.enter.prevent="toggleSupplier(supplier.id)"
-            @keydown.space.prevent="toggleSupplier(supplier.id)"
-          >
-            <td><strong>{{ supplier.name }}</strong></td>
-            <td><span class="code-tag">{{ supplier.category }}</span></td>
-            <td class="supplier-description">{{ supplier.description }}</td>
-            <td>{{ supplier.delivery }}</td>
-            <td>{{ supplier.sku }} SKU</td>
-            <td class="supplier-table-action">
-              <button
-                class="icon-button"
-                :aria-label="`ดูรายละเอียด ${supplier.name}`"
-                @click.stop="toggleSupplier(supplier.id)"
-              >
-                <SvgIcon class="supplier-table-chevron" name="chevron-right" size="20" />
-              </button>
-            </td>
-          </tr>
-          <tr
-            v-if="selectedId === supplier.id"
-            :id="`supplier-detail-${supplier.id}`"
-            class="supplier-detail-row"
-          >
-            <td colspan="6">
-              <div class="detail-card supplier-inline-detail">
-        <div class="detail-heading">
-          <div>
-            <span class="code-tag">{{ supplier.id }}</span>
-            <h2>{{ supplier.name }}</h2>
-            <p>{{ supplier.description }}</p>
-          </div>
-          <button class="button secondary" @click="openEdit">
-            <SvgIcon name="edit" />แก้ไขข้อมูล
-          </button>
-        </div>
-        <div class="info-grid">
-          <div>
-            <small>หมวดหมู่หลัก</small
-            ><strong>{{ supplier.category }}</strong>
-          </div>
-          <div>
-            <small>ระยะเวลาจัดส่ง</small
-            ><strong>{{ supplier.delivery }}</strong>
-          </div>
-          <div>
-            <small>จำนวน SKU</small
-            ><strong>{{ supplier.sku }} รายการ</strong>
-          </div>
-        </div>
-        <h3>สินค้าจากซัพพลายเออร์</h3>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>SKU</th>
-              <th>รายการสินค้า</th>
-              <th>ราคา</th>
-              <th>สถานะ</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="product in supplierProducts" :key="product.sku">
-              <td class="mono">{{ product.sku }}</td>
-              <td>
-                <strong>{{ product.name }}</strong
-                ><small class="table-subtext"
-                  >Stock {{ product.stock }} · Reorder Point
-                  {{ product.reorderPoint }}</small
-                >
-              </td>
-              <td>฿{{ product.price.toLocaleString("th-TH") }}</td>
-              <td>
-                <span
-                  :class="
-                    product.status === 'ต้องสั่งเพิ่ม'
-                      ? 'warning-tag'
-                      : 'success-tag'
-                  "
-                  >{{ product.status }}</span
-                >
-              </td>
-            </tr>
-            <tr v-if="!supplierProducts.length">
-              <td colspan="4" class="empty-state">
-                ยังไม่มีสินค้าที่ผูกกับซัพพลายเออร์รายนี้
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <TablePagination :total="supplierProducts.length" label="รายการสินค้า" />
-        <div class="supplier-product-link">
-          <div>
-            <strong>ผูกสินค้าเข้ากับ Supplier</strong
-            ><small
-              >กำหนดแหล่งจัดซื้อให้แต่ละ SKU เพื่อใช้กับงานสั่งซื้อและ
-              Reorder</small
+          <AppSearchField
+            v-model="filter"
+            class-name="table-filter-search"
+            placeholder="ค้นหาซัพพลายเออร์"
+            label="ค้นหาซัพพลายเออร์"
+          />
+          <div class="category-picker supplier-category-filter">
+            <button
+              type="button"
+              class="category-picker-trigger control-field"
+              :aria-expanded="showSupplierCategoryFilter"
+              aria-controls="supplier-category-options"
+              @click="showSupplierCategoryFilter = !showSupplierCategoryFilter"
             >
-          </div>
-          <div class="button-row">
-            <select v-model="productToAssign" aria-label="เลือกสินค้าที่จะผูก">
-              <option value="">เลือกสินค้า</option>
-              <option
-                v-for="product in unassignedProducts"
-                :key="product.sku"
-                :value="product.sku"
-              >
-                {{ product.sku }} · {{ product.name }}
-              </option></select
-            ><button
-              class="button secondary"
-              :disabled="!productToAssign"
-              @click="assignProduct"
-            >
-              <SvgIcon name="plus" />ผูกสินค้า
+              <span>หมวดหมู่</span><strong>{{ supplierCategoryFilter }}</strong
+              ><SvgIcon
+                class="supplier-category-chevron"
+                name="chevron-right"
+                size="16"
+              />
             </button>
-          </div>
-        </div>
-          </div>
-            </td>
-          </tr>
-        </template>
-          </tbody>
-        </table>
-      </div>
-      <TablePagination
-        :total="visibleSuppliers.length"
-        label="รายการซัพพลายเออร์"
-      />
-    </section>
-    <section class="panel purchase-orders-panel">
-      <div class="panel-toolbar purchase-orders-heading">
-        <div>
-          <h2 class="section-heading">รายการสั่งซื้อ</h2>
-          <p class="section-caption">รายการที่สร้างจาก Reorder Point และส่งต่อให้ทีมจัดซื้อ</p>
-        </div>
-        <button
-          type="button"
-          class="button secondary purchase-history-toggle"
-          @click="showPurchaseHistory = !showPurchaseHistory"
-        >
-          <SvgIcon name="refresh" size="15" />{{ showPurchaseHistory ? "กลับไปรายการปัจจุบัน" : "ดูประวัติที่สำเร็จแล้ว" }}
-        </button>
-      </div>
-      <div v-if="(showPurchaseHistory ? completedPurchaseOrders : activePurchaseOrders).length" class="purchase-orders-list">
-        <article v-for="order in (showPurchaseHistory ? completedPurchaseOrders : activePurchaseOrders)" :key="order.id" class="purchase-order-summary">
-          <div class="purchase-order-summary-head">
-            <strong>{{ order.id }}</strong>
-            <div class="purchase-order-summary-actions">
-              <span :class="orderStatusClass(order.status)">{{ order.status }}</span>
-              <button
-                v-if="!showPurchaseHistory"
-                type="button"
-                class="button secondary purchase-order-status-button"
-                :disabled="order.status === 'สำเร็จ'"
-                @click="advancePurchaseOrder(order)"
-              >
-                <SvgIcon name="refresh" size="14" />อัปเดตสถานะ
-              </button>
+            <div
+              v-if="showSupplierCategoryFilter"
+              id="supplier-category-options"
+              class="category-picker-menu"
+            >
+              <AppSearchField
+                v-model="supplierCategoryFilterQuery"
+                class-name="category-picker-search"
+                placeholder="ค้นหาหมวดหมู่"
+                label="ค้นหาหมวดหมู่ซัพพลายเออร์"
+              />
+              <div class="category-option-list">
+                <button
+                  type="button"
+                  :class="{ selected: supplierCategoryFilter === 'ทั้งหมด' }"
+                  @click="selectSupplierCategory('ทั้งหมด')"
+                >
+                  ทั้งหมด
+                </button>
+                <button
+                  v-for="category in filteredSupplierCategories"
+                  :key="category.category_id || category.name"
+                  type="button"
+                  :class="{
+                    selected: supplierCategoryFilter === category.name,
+                  }"
+                  @click="selectSupplierCategory(category.name)"
+                >
+                  {{ category.name }}
+                </button>
+                <p
+                  v-if="!filteredSupplierCategories.length"
+                  class="category-empty"
+                >
+                  ไม่พบหมวดหมู่ที่ค้นหา
+                </p>
+              </div>
             </div>
           </div>
-          <small>สร้างเมื่อ {{ new Date(order.createdAt).toLocaleString("th-TH") }}</small>
-          <ul>
-            <li v-for="item in order.items" :key="item.sku"><span>{{ item.name }} <em>{{ item.sku }}</em></span><strong>{{ item.quantity }} {{ item.unit }}</strong></li>
-          </ul>
-        </article>
-      </div>
-      <div v-else class="empty-state">{{ showPurchaseHistory ? "ยังไม่มีรายการสั่งซื้อที่สำเร็จ" : "ยังไม่มีรายการสั่งซื้อจากคลังสินค้า" }}</div>
-      <TablePagination
-        :total="(showPurchaseHistory ? completedPurchaseOrders : activePurchaseOrders).length"
-        :label="showPurchaseHistory ? 'ประวัติการสั่งซื้อ' : 'รายการสั่งซื้อ'"
-      />
-    </section>
+        </div>
+        <div class="table-scroll employee-directory-table-wrap">
+          <table
+            class="data-table employee-directory-table supplier-directory-table"
+          >
+            <thead>
+              <tr>
+                <th>ซัพพลายเออร์</th>
+                <th>หมวดหมู่</th>
+                <th>ผู้ติดต่อ</th>
+                <th>ระยะเวลาจัดส่ง</th>
+                <th>เงื่อนไขชำระเงิน</th>
+                <th>SKU</th>
+                <th aria-label="เปิดรายละเอียด"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="supplier in visibleSuppliers" :key="supplier.id">
+                <tr
+                  class="employee-directory-row supplier-table-row"
+                  :class="{ selected: selectedId === supplier.id }"
+                  :aria-expanded="selectedId === supplier.id"
+                  tabindex="0"
+                  @click="toggleSupplier(supplier.id)"
+                  @keydown.enter.prevent="toggleSupplier(supplier.id)"
+                  @keydown.space.prevent="toggleSupplier(supplier.id)"
+                >
+                  <td>
+                    <strong>{{ supplier.name }}</strong
+                    ><small class="table-subtext">{{
+                      supplier.description || "ยังไม่มีรายละเอียด"
+                    }}</small>
+                  </td>
+                  <td>
+                    <span class="code-tag">{{ supplier.category }}</span>
+                  </td>
+                  <td class="supplier-contact">
+                    <strong>{{ supplier.contactName || "ยังไม่ระบุ" }}</strong
+                    ><small class="table-subtext">{{
+                      supplier.contactPhone || "ยังไม่ระบุเบอร์โทร"
+                    }}</small>
+                  </td>
+                  <td>{{ supplier.delivery || "ยังไม่ระบุ" }}</td>
+                  <td>{{ supplier.paymentTerms || "ยังไม่ระบุ" }}</td>
+                  <td>{{ supplier.sku }} SKU</td>
+                  <td class="supplier-table-action">
+                    <button
+                      class="icon-button"
+                      :aria-label="`ดูรายละเอียด ${supplier.name}`"
+                      @click.stop="toggleSupplier(supplier.id)"
+                    >
+                      <SvgIcon
+                        class="supplier-table-chevron"
+                        name="chevron-right"
+                        size="20"
+                      />
+                    </button>
+                  </td>
+                </tr>
+                <tr
+                  v-if="selectedId === supplier.id"
+                  :id="`supplier-detail-${supplier.id}`"
+                  class="employee-detail-row supplier-detail-row"
+                >
+                  <td colspan="7">
+                    <div
+                      class="detail-card employee-inline-detail supplier-inline-detail"
+                    >
+                      <div class="detail-heading">
+                        <div>
+                          <span class="code-tag">{{ supplier.id }}</span>
+                          <h2>{{ supplier.name }}</h2>
+                          <p>{{ supplier.description }}</p>
+                        </div>
+                        <button class="button secondary" @click="openEdit">
+                          <SvgIcon name="edit" />แก้ไขข้อมูล
+                        </button>
+                      </div>
+                      <div class="info-grid">
+                        <div>
+                          <small>หมวดหมู่หลัก</small
+                          ><strong>{{ supplier.category }}</strong>
+                        </div>
+                        <div>
+                          <small>ระยะเวลาจัดส่ง</small
+                          ><strong>{{ supplier.delivery }}</strong>
+                        </div>
+                        <div>
+                          <small>จำนวน SKU</small
+                          ><strong>{{ supplier.sku }} รายการ</strong>
+                        </div>
+                        <div>
+                          <small>ผู้ติดต่อหลัก</small
+                          ><strong>{{
+                            supplier.contactName || "ยังไม่ระบุ"
+                          }}</strong>
+                        </div>
+                        <div>
+                          <small>ช่องทางติดต่อ</small
+                          ><strong>{{
+                            supplier.contactPhone || "ยังไม่ระบุ"
+                          }}</strong>
+                          <small>{{
+                            supplier.contactEmail || "ยังไม่ระบุอีเมล"
+                          }}</small>
+                        </div>
+                        <div>
+                          <small>เงื่อนไขชำระเงิน</small
+                          ><strong>{{
+                            supplier.paymentTerms || "ยังไม่ระบุ"
+                          }}</strong>
+                        </div>
+                      </div>
+                      <h3>สินค้าจากซัพพลายเออร์</h3>
+                      <table class="data-table">
+                        <thead>
+                          <tr>
+                            <th>SKU</th>
+                            <th>รายการสินค้า</th>
+                            <th>ราคา</th>
+                            <th>สถานะ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr
+                            v-for="product in supplierProducts"
+                            :key="product.sku"
+                          >
+                            <td class="mono">{{ product.sku }}</td>
+                            <td>
+                              <strong>{{ product.name }}</strong
+                              ><small class="table-subtext"
+                                >Stock {{ product.stock }} · Reorder Point
+                                {{ product.reorderPoint }}</small
+                              >
+                            </td>
+                            <td>
+                              ฿{{ product.price.toLocaleString("th-TH") }}
+                            </td>
+                            <td>
+                              <span
+                                :class="
+                                  product.status === 'ต้องสั่งเพิ่ม'
+                                    ? 'warning-tag'
+                                    : 'success-tag'
+                                "
+                                >{{ product.status }}</span
+                              >
+                            </td>
+                          </tr>
+                          <tr v-if="!supplierProducts.length">
+                            <td colspan="4" class="empty-state">
+                              ยังไม่มีสินค้าที่ผูกกับซัพพลายเออร์รายนี้
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <TablePagination
+                        :total="supplierProducts.length"
+                        label="รายการสินค้า"
+                      />
+                      <div class="supplier-product-link">
+                        <div>
+                          <strong>ผูกสินค้าเข้ากับ Supplier</strong
+                          ><small
+                            >กำหนดแหล่งจัดซื้อให้แต่ละ SKU
+                            เพื่อใช้กับงานสั่งซื้อและ Reorder</small
+                          >
+                        </div>
+                        <div class="button-row">
+                          <select
+                            v-model="productToAssign"
+                            aria-label="เลือกสินค้าที่จะผูก"
+                          >
+                            <option value="">เลือกสินค้า</option>
+                            <option
+                              v-for="product in unassignedProducts"
+                              :key="product.sku"
+                              :value="product.sku"
+                            >
+                              {{ product.sku }} · {{ product.name }}
+                            </option></select
+                          ><button
+                            class="button secondary"
+                            :disabled="!productToAssign"
+                            @click="assignProduct"
+                          >
+                            <SvgIcon name="plus" />ผูกสินค้า
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <TablePagination
+          :total="visibleSuppliers.length"
+          label="รายการซัพพลายเออร์"
+        />
+      </section>
+      <section class="panel purchase-orders-panel">
+        <div class="panel-toolbar purchase-orders-heading">
+          <div>
+            <h2 class="section-heading">รายการสั่งซื้อ</h2>
+            <p class="section-caption">
+              รายการที่สร้างจาก Reorder Point และส่งต่อให้ทีมจัดซื้อ
+            </p>
+          </div>
+        </div>
+        <div v-if="activePurchaseOrders.length" class="purchase-orders-list">
+          <article
+            v-for="order in activePurchaseOrders"
+            :key="order.id"
+            class="purchase-order-summary"
+          >
+            <div class="purchase-order-summary-head">
+              <strong>{{ order.id }}</strong>
+              <div class="purchase-order-summary-actions">
+                <select
+                  v-model="order.status"
+                  class="table-status-select purchase-order-status-select"
+                  :class="orderStatusClass(order.status)"
+                  :aria-label="`เลือกสถานะ ${order.id}`"
+                  @change="updatePurchaseOrderStatus(order)"
+                >
+                  <option v-for="status in purchaseOrderStatuses" :key="status">
+                    {{ status }}
+                  </option>
+                </select>
+                <button
+                  v-if="order.status === 'รับของเรียบร้อยแล้ว'"
+                  type="button"
+                  class="button primary purchase-order-complete-button"
+                  @click="completePurchaseOrder(order)"
+                >
+                  <SvgIcon name="check" size="14" />ยืนยันรับของและปิดรายการ
+                </button>
+              </div>
+            </div>
+            <small
+              >สร้างเมื่อ
+              {{ new Date(order.createdAt).toLocaleString("th-TH") }}</small
+            >
+            <ul>
+              <li v-for="item in order.items" :key="item.sku">
+                <span
+                  >{{ item.name }} <em>{{ item.sku }}</em></span
+                ><strong
+                  >{{ item.quantity ?? item.qty }} {{ item.unit }}</strong
+                >
+              </li>
+            </ul>
+          </article>
+        </div>
+        <div v-else class="empty-state">
+          ยังไม่มีรายการสั่งซื้อจากคลังสินค้า
+        </div>
+        <TablePagination
+          :total="activePurchaseOrders.length"
+          label="รายการสั่งซื้อ"
+        />
+      </section>
+      <section class="panel purchase-orders-panel purchase-history-panel">
+        <div class="panel-toolbar purchase-orders-heading">
+          <div>
+            <h2 class="section-heading">ประวัติการสั่งซื้อ</h2>
+            <p class="section-caption">
+              รายการสั่งซื้อที่รับของและปิดรายการสำเร็จแล้ว
+            </p>
+          </div>
+          <span class="completed-jobs-count"
+            >{{ completedPurchaseOrders.length }} รายการ</span
+          >
+        </div>
+        <div v-if="completedPurchaseOrders.length" class="purchase-orders-list">
+          <article
+            v-for="order in completedPurchaseOrders"
+            :key="`history-${order.id}`"
+            class="purchase-order-summary"
+          >
+            <div class="purchase-order-summary-head">
+              <strong>{{ order.id }}</strong>
+              <span :class="orderStatusClass(order.status)">{{
+                order.status
+              }}</span>
+            </div>
+            <small
+              >สร้างเมื่อ
+              {{ new Date(order.createdAt).toLocaleString("th-TH") }} ·
+              รับของเมื่อ
+              {{
+                order.completedAt
+                  ? new Date(order.completedAt).toLocaleString("th-TH")
+                  : "—"
+              }}</small
+            >
+            <ul>
+              <li v-for="item in order.items" :key="item.sku">
+                <span
+                  >{{ item.name }} <em>{{ item.sku }}</em></span
+                ><strong
+                  >{{ item.quantity ?? item.qty }} {{ item.unit }}</strong
+                >
+              </li>
+            </ul>
+          </article>
+        </div>
+        <div v-else class="empty-state">ยังไม่มีรายการสั่งซื้อที่สำเร็จ</div>
+        <TablePagination
+          :total="completedPurchaseOrders.length"
+          label="ประวัติการสั่งซื้อ"
+        />
+      </section>
     </div>
     <div v-if="isOpen" class="modal-backdrop" @click.self="close">
-      <form class="modal product-modal supplier-modal" @submit.prevent="saveSupplier">
+      <form
+        class="modal product-modal supplier-modal"
+        @submit.prevent="saveSupplier"
+      >
         <div class="modal-heading">
           <div>
             <span class="eyebrow">SUPPLIER REGISTRATION</span>
             <h2>
               {{
-                editingSupplier ? "แก้ไขข้อมูลซัพพลายเออร์" : "เพิ่มซัพพลายเออร์"
+                editingSupplier
+                  ? "แก้ไขข้อมูลซัพพลายเออร์"
+                  : "เพิ่มซัพพลายเออร์"
               }}
             </h2>
           </div>
@@ -469,48 +648,112 @@ function advancePurchaseOrder(order) {
               required
               placeholder="เช่น Huawei Solar" /></label
           ><label
-            >หมวดหมู่<div class="category-select-row">
-              <select v-model="form.category" required>
-                <option disabled value="">เลือกหมวดหมู่ซัพพลายเออร์</option>
-                <option v-for="category in supplierCategories" :key="category.category_id" :value="category.name">
-                  {{ category.name }}
-                </option>
-              </select>
-              <button type="button" class="button secondary" @click="openCategoryModal">
-                <SvgIcon name="plus" />เพิ่ม
-              </button>
+            >หมวดหมู่
+            <div class="category-select-row">
+              <AppSelect
+                v-model="form.category"
+                :options="
+                  supplierCategories.map((category) => ({
+                    value: category.name,
+                    label: category.name,
+                  }))
+                "
+                placeholder="เลือกหมวดหมู่ซัพพลายเออร์"
+                aria-label="เลือกหมวดหมู่ซัพพลายเออร์"
+                required
+              >
+                <template #menu-footer="{ close }">
+                  <button
+                    type="button"
+                    class="app-select-add-action"
+                    @click.stop="
+                      close();
+                      openCategoryModal();
+                    "
+                  >
+                    <SvgIcon name="plus" size="15" />เพิ่มหมวดหมู่
+                  </button>
+                </template>
+              </AppSelect>
             </div></label
           ><label
             >รายละเอียด<input
               v-model="form.description"
               placeholder="คำอธิบายและจุดเด่นของ Supplier" /></label
           ><label
+            >ผู้ติดต่อหลัก<input
+              v-model="form.contactName"
+              required
+              placeholder="ชื่อผู้ประสานงาน" /></label
+          ><label
+            >เบอร์โทรศัพท์ผู้ติดต่อ<input
+              v-model="form.contactPhone"
+              type="tel"
+              required
+              placeholder="เช่น 081-234-5678" /></label
+          ><label
+            >อีเมลผู้ติดต่อ<input
+              v-model="form.contactEmail"
+              type="email"
+              placeholder="เช่น sales@example.com" /></label
+          ><label
             >ระยะเวลาจัดส่ง<input
               v-model="form.delivery"
-              placeholder="เช่น 2-3 วัน"
+              required
+              placeholder="เช่น 2-3 วัน" /></label
+          ><label
+            >เงื่อนไขชำระเงิน<input
+              v-model="form.paymentTerms"
+              required
+              placeholder="เช่น เครดิต 30 วัน"
           /></label>
         </div>
         <div class="button-row end">
-          <button type="button" class="button secondary" @click="close">ยกเลิก</button
-          ><button type="submit" class="button primary">บันทึกข้อมูลซัพพลายเออร์</button>
+          <button type="button" class="button secondary" @click="close">
+            ยกเลิก</button
+          ><button type="submit" class="button primary">
+            บันทึกข้อมูลซัพพลายเออร์
+          </button>
         </div>
       </form>
     </div>
-    <div v-if="showCategoryModal" class="modal-backdrop" @click.self="showCategoryModal = false">
+    <div
+      v-if="showCategoryModal"
+      class="modal-backdrop"
+      @click.self="showCategoryModal = false"
+    >
       <form class="modal category-modal" @submit.prevent="saveCategory">
         <div class="modal-heading">
           <div>
             <span class="eyebrow">SUPPLIER CATEGORY</span>
             <h2>เพิ่มหมวดหมู่ซัพพลายเออร์</h2>
           </div>
-          <button type="button" class="icon-button" title="ปิด" @click="showCategoryModal = false">
+          <button
+            type="button"
+            class="icon-button"
+            title="ปิด"
+            @click="showCategoryModal = false"
+          >
             <SvgIcon name="close" />
           </button>
         </div>
-        <label>ชื่อหมวดหมู่ใหม่<input v-model="newCategoryName" required placeholder="เช่น อุปกรณ์โครงสร้างและติดตั้ง" /></label>
-        <p class="form-helper">หมวดหมู่จะถูกบันทึกลงฐานข้อมูลและพร้อมเลือกใช้ทันที</p>
+        <label
+          >ชื่อหมวดหมู่ใหม่<input
+            v-model="newCategoryName"
+            required
+            placeholder="เช่น อุปกรณ์โครงสร้างและติดตั้ง"
+        /></label>
+        <p class="form-helper">
+          หมวดหมู่จะถูกบันทึกลงฐานข้อมูลและพร้อมเลือกใช้ทันที
+        </p>
         <div class="button-row end">
-          <button type="button" class="button secondary" @click="showCategoryModal = false">ยกเลิก</button>
+          <button
+            type="button"
+            class="button secondary"
+            @click="showCategoryModal = false"
+          >
+            ยกเลิก
+          </button>
           <button type="submit" class="button primary">บันทึกหมวดหมู่</button>
         </div>
       </form>

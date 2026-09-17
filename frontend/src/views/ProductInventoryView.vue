@@ -5,6 +5,8 @@ import { useRoute, useRouter } from "vue-router";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppPageHeader from "@/components/ui/AppPageHeader.vue";
 import AppSearchField from "@/components/ui/AppSearchField.vue";
+import AppSelect from "@/components/ui/AppSelect.vue";
+import InventoryFormModal from "@/components/ui/InventoryFormModal.vue";
 import SvgIcon from "@/components/SvgIcon.vue";
 import TablePagination from "@/components/TablePagination.vue";
 import { useSearch } from "@/composables/useSearch";
@@ -30,6 +32,9 @@ const toast = ref(null);
 const selectedReorderSkus = ref([]);
 const showPurchaseOrderModal = ref(false);
 const purchaseOrderItems = ref([]);
+const showManualPurchaseModal = ref(false);
+const manualPurchaseSearch = ref("");
+const selectedManualPurchaseSkus = ref([]);
 const newCategoryName = ref("");
 let toastTimer;
 // รายการสินค้าที่โหลดจาก API คลังสินค้า
@@ -46,6 +51,7 @@ const form = ref({
   reorderPoint: 10,
   unit: "ชิ้น",
   price: 0,
+  salePrice: 0,
   supplier: "",
 });
 const { query, filteredItems } = useSearch(products, [
@@ -55,11 +61,12 @@ const { query, filteredItems } = useSearch(products, [
 ]);
 const categories = ref(["ทั้งหมด"]);
 const statusFilter = ref("ทั้งหมด");
-const statusOptions = ["ทั้งหมด", "พร้อมขาย", "ต้องสั่งเพิ่ม"];
+const statusOptions = mockDb.get("inventoryStatuses");
 const filteredProducts = computed(() =>
-  filteredItems.value.filter((item) =>
-    (category.value === "ทั้งหมด" || item.category === category.value) &&
-    (statusFilter.value === "ทั้งหมด" || item.status === statusFilter.value),
+  filteredItems.value.filter(
+    (item) =>
+      (category.value === "ทั้งหมด" || item.category === category.value) &&
+      (statusFilter.value === "ทั้งหมด" || item.status === statusFilter.value),
   ),
 );
 const filteredCategoryOptions = computed(() =>
@@ -70,10 +77,34 @@ const filteredCategoryOptions = computed(() =>
 const lowStock = computed(() =>
   products.value.filter((item) => item.stock <= item.reorderPoint),
 );
+const manualPurchaseProducts = computed(() => {
+  const query = manualPurchaseSearch.value.trim().toLocaleLowerCase("th-TH");
+  if (!query) return products.value;
+  return products.value.filter((item) =>
+    `${item.name} ${item.sku} ${item.category}`
+      .toLocaleLowerCase("th-TH")
+      .includes(query),
+  );
+});
 const formattedMoney = (value) => `฿${Number(value).toLocaleString("th-TH")}`;
+function getLatestCost(product) {
+  const lots = Array.isArray(product?.costLots) ? product.costLots : [];
+  const latestLot = [...lots].sort(
+    (a, b) => new Date(b.receivedAt) - new Date(a.receivedAt),
+  )[0];
+  return Number(
+    latestLot?.unitCost ?? product?.costPrice ?? product?.price ?? 0,
+  );
+}
+function getProductSalePrice(product) {
+  return Number(product?.salePrice ?? product?.price ?? 0);
+}
+function getProductPricing(product) {
+  return pricingDecision(getProductSalePrice(product), product);
+}
 const filteredInventoryValue = computed(() =>
   filteredProducts.value.reduce(
-    (sum, item) => sum + item.stock * item.price,
+    (sum, item) => sum + item.stock * getWeightedAverageCost(item),
     0,
   ),
 );
@@ -130,6 +161,7 @@ function resetForm() {
     reorderPoint: 10,
     unit: "ชิ้น",
     price: 0,
+    salePrice: 0,
     supplier: "",
   };
   editingProduct.value = null;
@@ -169,7 +201,10 @@ async function saveCategory() {
   }
 }
 function openEdit(product) {
-  form.value = { ...product };
+  form.value = {
+    ...product,
+    salePrice: product.salePrice ?? product.price ?? 0,
+  };
   editingProduct.value = product;
   showModal.value = true;
 }
@@ -181,6 +216,8 @@ async function saveProduct() {
     stock: Number(form.value.stock),
     reorder_point: Number(form.value.reorderPoint),
     price: Number(form.value.price),
+    costPrice: Number(form.value.price),
+    salePrice: Number(form.value.salePrice),
   };
   try {
     if (editingProduct.value)
@@ -188,9 +225,11 @@ async function saveProduct() {
     else await inventoryApi.createProduct(payload);
     await loadProducts();
     showModal.value = false;
-    notify(editingProduct.value
-      ? "บันทึกการแก้ไขสินค้าแล้ว"
-      : "ลงทะเบียนสินค้าใหม่แล้ว");
+    notify(
+      editingProduct.value
+        ? "บันทึกการแก้ไขสินค้าแล้ว"
+        : "ลงทะเบียนสินค้าใหม่แล้ว",
+    );
   } catch (error) {
     loadError.value = error.message;
   }
@@ -227,8 +266,12 @@ function toggleReorderSelection(sku) {
     ? selectedReorderSkus.value.filter((item) => item !== sku)
     : [...selectedReorderSkus.value, sku];
 }
-function openPurchaseOrder() {
-  const selected = lowStock.value.filter((item) => selectedReorderSkus.value.includes(item.sku));
+function openPurchaseOrder(items = null) {
+  const selected =
+    items ||
+    lowStock.value.filter((item) =>
+      selectedReorderSkus.value.includes(item.sku),
+    );
   if (!selected.length) return;
   purchaseOrderItems.value = selected.map((item) => ({
     sku: item.sku,
@@ -243,18 +286,49 @@ function openPurchaseOrder() {
   }));
   showPurchaseOrderModal.value = true;
 }
+function openManualPurchasePicker() {
+  manualPurchaseSearch.value = "";
+  selectedManualPurchaseSkus.value = [];
+  showManualPurchaseModal.value = true;
+}
+function toggleManualPurchaseSelection(sku) {
+  selectedManualPurchaseSkus.value = selectedManualPurchaseSkus.value.includes(
+    sku,
+  )
+    ? selectedManualPurchaseSkus.value.filter((item) => item !== sku)
+    : [...selectedManualPurchaseSkus.value, sku];
+}
+function addManualPurchaseItems() {
+  const selected = products.value.filter((item) =>
+    selectedManualPurchaseSkus.value.includes(item.sku),
+  );
+  showManualPurchaseModal.value = false;
+  openPurchaseOrder(selected);
+}
 function removePurchaseOrderItem(sku) {
-  purchaseOrderItems.value = purchaseOrderItems.value.filter((item) => item.sku !== sku);
-  selectedReorderSkus.value = selectedReorderSkus.value.filter((item) => item !== sku);
+  purchaseOrderItems.value = purchaseOrderItems.value.filter(
+    (item) => item.sku !== sku,
+  );
+  selectedReorderSkus.value = selectedReorderSkus.value.filter(
+    (item) => item !== sku,
+  );
 }
 function createPurchaseOrder() {
   if (!purchaseOrderItems.value.length) return;
   const existing = mockDb.get("purchaseOrders");
   const order = {
-    id: `PO-${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 12)}`,
+    id: `PO-${new Date()
+      .toISOString()
+      .replace(/[-:TZ.]/g, "")
+      .slice(0, 12)}`,
     createdAt: new Date().toISOString(),
     status: "รอดำเนินการ",
-    items: purchaseOrderItems.value.map((item) => ({ ...item, quantity: Number(item.quantity) || 1, unitCost: Number(item.unitCost) || 0, priceAtOrder: Number(item.unitCost) || 0 })),
+    items: purchaseOrderItems.value.map((item) => ({
+      ...item,
+      quantity: Number(item.quantity) || 1,
+      unitCost: Number(item.unitCost) || 0,
+      priceAtOrder: Number(item.unitCost) || 0,
+    })),
   };
   mockDb.set("purchaseOrders", [order, ...existing]);
   showPurchaseOrderModal.value = false;
@@ -279,7 +353,10 @@ function createPurchaseOrder() {
       {{ loadError }}
       <button class="button secondary" @click="loadProducts">ลองใหม่</button>
     </div>
-    <section v-if="!isLoading && !loadError" class="operations-table-section inventory-table-section">
+    <section
+      v-if="!isLoading && !loadError"
+      class="operations-table-section inventory-table-section"
+    >
       <div class="task-table-heading">
         <div>
           <h2 class="section-heading">ทะเบียนสินค้า</h2>
@@ -290,11 +367,25 @@ function createPurchaseOrder() {
         </button>
       </div>
       <div class="task-overview-grid">
-        <div><span>สินค้าทั้งหมด</span><strong>{{ filteredProducts.length }}</strong><small>รายการในมุมมองนี้</small></div>
-        <div><span>มูลค่าคงคลัง</span><strong>{{ formattedMoney(filteredInventoryValue) }}</strong><small>รวมจากรายการที่แสดง</small></div>
-        <div><span>ถึง Reorder Point</span><strong>{{ filteredLowStock.length }}</strong><small>รายการในมุมมองนี้</small></div>
+        <div>
+          <span>สินค้าทั้งหมด</span
+          ><strong>{{ filteredProducts.length }}</strong
+          ><small>รายการในมุมมองนี้</small>
+        </div>
+        <div>
+          <span>มูลค่าคงคลัง</span
+          ><strong>{{ formattedMoney(filteredInventoryValue) }}</strong
+          ><small>รวมจากรายการที่แสดง</small>
+        </div>
+        <div>
+          <span>ถึง Reorder Point</span
+          ><strong>{{ filteredLowStock.length }}</strong
+          ><small>รายการในมุมมองนี้</small>
+        </div>
       </div>
-      <div class="task-table-tools table-filters-below-overview inventory-table-filters">
+      <div
+        class="task-table-tools table-filters-below-overview inventory-table-filters"
+      >
         <AppSearchField
           v-model="query"
           class-name="table-filter-search"
@@ -309,9 +400,18 @@ function createPurchaseOrder() {
             aria-controls="inventory-status-options"
             @click="showStatusPicker = !showStatusPicker"
           >
-            <span>สถานะ</span><strong>{{ statusFilter }}</strong><SvgIcon class="status-picker-chevron" name="chevron-right" size="16" />
+            <span>สถานะ</span><strong>{{ statusFilter }}</strong
+            ><SvgIcon
+              class="status-picker-chevron"
+              name="chevron-right"
+              size="16"
+            />
           </button>
-          <div v-if="showStatusPicker" id="inventory-status-options" class="category-picker-menu">
+          <div
+            v-if="showStatusPicker"
+            id="inventory-status-options"
+            class="category-picker-menu"
+          >
             <div class="category-option-list">
               <button
                 v-for="status in statusOptions"
@@ -319,46 +419,48 @@ function createPurchaseOrder() {
                 type="button"
                 :class="{ selected: statusFilter === status }"
                 @click="selectStatus(status)"
-              >{{ status }}</button>
+              >
+                {{ status }}
+              </button>
             </div>
           </div>
         </div>
         <div class="category-picker">
-            <button
-              type="button"
-              class="category-picker-trigger control-field"
-              :aria-expanded="showCategoryPicker"
-              aria-controls="inventory-category-options"
-              @click="showCategoryPicker = !showCategoryPicker"
-            >
-              <span>หมวดหมู่</span><strong>{{ category }}</strong>
-            </button>
-            <div
-              v-if="showCategoryPicker"
-              id="inventory-category-options"
-              class="category-picker-menu"
-            >
-              <AppSearchField
-                v-model="categoryFilterQuery"
-                class-name="category-picker-search"
-                placeholder="ค้นหาหมวดหมู่"
-                label="ค้นหาหมวดหมู่"
-              />
-              <div class="category-option-list">
-                <button
-                  v-for="item in filteredCategoryOptions"
-                  :key="item"
-                  type="button"
-                  :class="{ selected: category === item }"
-                  @click="selectCategory(item)"
-                >
-                  {{ item }}
-                </button>
-                <p v-if="!filteredCategoryOptions.length" class="category-empty">
-                  ไม่พบหมวดหมู่ที่ค้นหา
-                </p>
-              </div>
+          <button
+            type="button"
+            class="category-picker-trigger control-field"
+            :aria-expanded="showCategoryPicker"
+            aria-controls="inventory-category-options"
+            @click="showCategoryPicker = !showCategoryPicker"
+          >
+            <span>หมวดหมู่</span><strong>{{ category }}</strong>
+          </button>
+          <div
+            v-if="showCategoryPicker"
+            id="inventory-category-options"
+            class="category-picker-menu"
+          >
+            <AppSearchField
+              v-model="categoryFilterQuery"
+              class-name="category-picker-search"
+              placeholder="ค้นหาหมวดหมู่"
+              label="ค้นหาหมวดหมู่"
+            />
+            <div class="category-option-list">
+              <button
+                v-for="item in filteredCategoryOptions"
+                :key="item"
+                type="button"
+                :class="{ selected: category === item }"
+                @click="selectCategory(item)"
+              >
+                {{ item }}
+              </button>
+              <p v-if="!filteredCategoryOptions.length" class="category-empty">
+                ไม่พบหมวดหมู่ที่ค้นหา
+              </p>
             </div>
+          </div>
         </div>
       </div>
       <div class="table-scroll">
@@ -370,7 +472,7 @@ function createPurchaseOrder() {
               <th>หมวดหมู่</th>
               <th>คงเหลือ</th>
               <th>Reorder Point</th>
-              <th>มูลค่า</th>
+              <th>ต้นทุน / ราคาขาย</th>
               <th>สถานะ</th>
               <th>จัดการ</th>
             </tr>
@@ -390,10 +492,36 @@ function createPurchaseOrder() {
                 {{ product.unit }}
               </td>
               <td>{{ product.reorderPoint }} {{ product.unit }}</td>
-              <td class="mono">
-                {{ formattedMoney(product.stock * product.price) }}
-                <small class="table-subtext pricing-meta">ต้นทุนเฉลี่ย {{ formattedMoney(getWeightedAverageCost(product)) }}</small>
-                <small class="table-subtext pricing-meta">ขายแนะนำ {{ formattedMoney(pricingDecision(product.salePrice ?? product.price, product).recommendedPrice) }}</small>
+              <td class="inventory-pricing-cell">
+                <strong
+                  >ทุนล่าสุด
+                  {{ formattedMoney(getLatestCost(product)) }}</strong
+                >
+                <small class="table-subtext pricing-meta"
+                  >เฉลี่ยถ่วงน้ำหนัก
+                  {{ formattedMoney(getWeightedAverageCost(product)) }}</small
+                >
+                <small class="table-subtext pricing-meta"
+                  >ขาย {{ formattedMoney(getProductSalePrice(product)) }}</small
+                >
+                <small
+                  class="table-subtext pricing-meta"
+                  :class="
+                    getProductPricing(product).isLoss
+                      ? 'pricing-danger'
+                      : 'pricing-safe'
+                  "
+                >
+                  {{
+                    getProductPricing(product).isLoss
+                      ? "ขาดทุน"
+                      : `กำไร ${Math.round(getProductPricing(product).marginRate * 100)}%`
+                  }}
+                  · ขั้นต่ำ
+                  {{
+                    formattedMoney(getProductPricing(product).recommendedPrice)
+                  }}
+                </small>
               </td>
               <td>
                 <span
@@ -439,13 +567,27 @@ function createPurchaseOrder() {
             ระบบแจ้งเตือนเมื่อ Stock เหลือน้อยกว่าหรือเท่ากับค่าที่ตั้งไว้
           </p>
         </div>
-        <button
-          class="button primary"
-          :disabled="!selectedReorderSkus.length"
-          @click="openPurchaseOrder"
-        >
-          <SvgIcon name="plus" />สร้างคำสั่งซื้อ ({{ selectedReorderSkus.length }})
-        </button>
+        <div class="button-row reorder-actions">
+          <button
+            class="button secondary"
+            type="button"
+            @click="openManualPurchasePicker"
+          >
+            <SvgIcon name="plus" />สั่งซื้อสินค้าอื่น
+          </button>
+          <button
+            class="button primary"
+            type="button"
+            :disabled="!selectedReorderSkus.length"
+            @click="openPurchaseOrder"
+          >
+            <SvgIcon name="plus" />สร้างคำสั่งซื้อ<span
+              v-if="selectedReorderSkus.length"
+            >
+              ({{ selectedReorderSkus.length }})</span
+            >
+          </button>
+        </div>
       </div>
       <div class="table-scroll reorder-table-wrap">
         <table class="data-table reorder-table">
@@ -454,14 +596,31 @@ function createPurchaseOrder() {
               <th>ชื่อสินค้า</th>
               <th>รหัสสินค้า</th>
               <th>จำนวนปัจจุบัน / Reorder Point</th>
-              <th class="reorder-select-cell"><span class="sr-only">เลือก</span></th>
+              <th class="reorder-select-cell">
+                <span class="sr-only">เลือก</span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="product in lowStock" :key="product.sku" :class="{ selected: selectedReorderSkus.includes(product.sku) }">
-              <td><strong>{{ product.name }}</strong><small class="table-subtext">{{ product.supplier }}</small></td>
-              <td><span class="sku-code">{{ product.sku }}</span></td>
-              <td><strong class="low-stock-number">{{ product.stock }} {{ product.unit }}</strong><span class="reorder-target">/ {{ product.reorderPoint }} {{ product.unit }}</span></td>
+            <tr
+              v-for="product in lowStock"
+              :key="product.sku"
+              :class="{ selected: selectedReorderSkus.includes(product.sku) }"
+            >
+              <td>
+                <strong>{{ product.name }}</strong
+                ><small class="table-subtext">{{ product.supplier }}</small>
+              </td>
+              <td>
+                <span class="sku-code">{{ product.sku }}</span>
+              </td>
+              <td>
+                <strong class="low-stock-number"
+                  >{{ product.stock }} {{ product.unit }}</strong
+                ><span class="reorder-target"
+                  >/ {{ product.reorderPoint }} {{ product.unit }}</span
+                >
+              </td>
               <td class="reorder-select-cell">
                 <input
                   type="checkbox"
@@ -471,70 +630,276 @@ function createPurchaseOrder() {
                 />
               </td>
             </tr>
-            <tr v-if="!lowStock.length"><td colspan="4" class="empty-state">ไม่มีสินค้าที่ต้องสั่งเพิ่มในขณะนี้</td></tr>
+            <tr v-if="!lowStock.length">
+              <td colspan="4" class="empty-state">
+                ไม่มีสินค้าที่ต้องสั่งเพิ่มในขณะนี้
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
     </section>
-    <div v-if="showPurchaseOrderModal" class="modal-backdrop" @click.self="showPurchaseOrderModal = false">
-      <section class="modal purchase-order-modal" aria-labelledby="purchase-order-title">
-        <div class="modal-heading">
-          <div><span class="eyebrow">PURCHASE ORDER</span><h2 id="purchase-order-title">รายการสั่งซื้อ</h2></div>
-          <button type="button" class="icon-button" title="ปิด" @click="showPurchaseOrderModal = false"><SvgIcon name="close" /></button>
-        </div>
-        <p class="form-helper">ตรวจสอบและแก้ไขจำนวนที่ต้องการสั่ง ก่อนส่งรายการไปยังหน้าซัพพลายเออร์</p>
-        <div class="purchase-order-list">
-          <div v-for="item in purchaseOrderItems" :key="item.sku" class="purchase-order-row">
-            <div><strong>{{ item.name }}</strong><small>{{ item.sku }} · {{ item.supplier }}</small></div>
-            <label>จำนวนสั่งซื้อ<input v-model.number="item.quantity" type="number" min="1" step="1" :aria-label="`จำนวนสั่งซื้อ ${item.name}`" /></label>
-            <label>ต้นทุน/หน่วย<input v-model.number="item.unitCost" type="number" min="0" step="0.01" :aria-label="`ต้นทุนต่อหน่วย ${item.name}`" /></label>
-            <small v-if="item.unitCost > item.price" class="purchase-cost-warning">สูงกว่าต้นทุนเดิม ฿{{ Number(item.price).toLocaleString('th-TH') }}</small>
-            <button type="button" class="icon-button" title="ลบรายการ" :aria-label="`ลบ ${item.name}`" @click="removePurchaseOrderItem(item.sku)"><SvgIcon name="close" size="16" /></button>
-          </div>
-          <p v-if="!purchaseOrderItems.length" class="empty-state">ไม่มีรายการที่เลือก</p>
-        </div>
-        <div class="button-row end"><button type="button" class="button secondary" @click="showPurchaseOrderModal = false">กลับไปแก้ไข</button><button type="button" class="button primary" :disabled="!purchaseOrderItems.length" @click="createPurchaseOrder">สร้างรายการสั่งซื้อ</button></div>
-      </section>
-    </div>
+    <InventoryFormModal
+      v-if="showManualPurchaseModal"
+      eyebrow="MANUAL PURCHASE"
+      title="เลือกสินค้าที่ต้องการสั่งซื้อ"
+      description="เลือกสินค้าได้แม้ยังไม่ถึง Reorder Point สำหรับงานเร่ง งานโครงการ หรือการเติมสต็อกล่วงหน้า"
+      modal-class="manual-purchase-modal"
+      @close="showManualPurchaseModal = false"
+      @submit="addManualPurchaseItems"
+    >
+      <AppSearchField
+        v-model="manualPurchaseSearch"
+        class-name="manual-purchase-search"
+        placeholder="ค้นหาชื่อสินค้า SKU หรือหมวดหมู่..."
+        label="ค้นหาสินค้าสำหรับสั่งซื้อล่วงหน้า"
+      />
+      <div class="table-scroll manual-purchase-table-wrap">
+        <table class="data-table manual-purchase-table">
+          <thead>
+            <tr>
+              <th class="manual-purchase-check-column" aria-label="เลือก"></th>
+              <th>สินค้า</th>
+              <th>คงเหลือ</th>
+              <th>Reorder Point</th>
+              <th>ซัพพลายเออร์</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="product in manualPurchaseProducts"
+              :key="product.sku"
+              :class="{
+                selected: selectedManualPurchaseSkus.includes(product.sku),
+              }"
+            >
+              <td class="manual-purchase-check-column">
+                <input
+                  type="checkbox"
+                  :checked="selectedManualPurchaseSkus.includes(product.sku)"
+                  :aria-label="`เลือก ${product.name}`"
+                  @change="toggleManualPurchaseSelection(product.sku)"
+                />
+              </td>
+              <td>
+                <strong>{{ product.name }}</strong
+                ><small class="table-subtext">{{ product.sku }}</small>
+              </td>
+              <td>{{ product.stock }} {{ product.unit }}</td>
+              <td>{{ product.reorderPoint }} {{ product.unit }}</td>
+              <td>{{ product.supplier || "ยังไม่ระบุ" }}</td>
+            </tr>
+            <tr v-if="!manualPurchaseProducts.length">
+              <td colspan="5" class="empty-state">ไม่พบสินค้าที่ค้นหา</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <template #footer-pagination>
+        <TablePagination
+          :total="manualPurchaseProducts.length"
+          label="รายการสินค้า"
+        />
+      </template>
+      <template #actions>
+        <button
+          type="button"
+          class="button secondary"
+          @click="showManualPurchaseModal = false"
+        >
+          ยกเลิก
+        </button>
+        <button
+          type="submit"
+          class="button primary"
+          :disabled="!selectedManualPurchaseSkus.length"
+        >
+          <SvgIcon name="plus" />เพิ่มรายการ ({{
+            selectedManualPurchaseSkus.length
+          }})
+        </button>
+      </template>
+    </InventoryFormModal>
+    <InventoryFormModal
+      v-if="showPurchaseOrderModal"
+      eyebrow="PURCHASE ORDER"
+      title="รายการสั่งซื้อ"
+      description="ตรวจสอบและแก้ไขจำนวนที่ต้องการสั่ง ก่อนส่งรายการไปยังหน้าซัพพลายเออร์"
+      modal-class="purchase-order-modal"
+      @close="showPurchaseOrderModal = false"
+      @submit="createPurchaseOrder"
+    >
+      <div class="table-scroll purchase-order-table-wrap">
+        <table
+          v-if="purchaseOrderItems.length"
+          class="data-table purchase-order-table"
+        >
+          <thead>
+            <tr>
+              <th>สินค้า</th>
+              <th class="purchase-order-number-column">จำนวนสั่งซื้อ</th>
+              <th class="purchase-order-cost-column">ต้นทุน/หน่วย</th>
+              <th
+                class="purchase-order-action-column"
+                aria-label="ลบรายการ"
+              ></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in purchaseOrderItems" :key="item.sku">
+              <td>
+                <strong>{{ item.name }}</strong>
+                <small class="table-subtext"
+                  >{{ item.sku }} · {{ item.supplier }}</small
+                >
+              </td>
+              <td class="purchase-order-number-column">
+                <input
+                  v-model.number="item.quantity"
+                  type="number"
+                  min="1"
+                  step="1"
+                  :aria-label="`จำนวนสั่งซื้อ ${item.name}`"
+                />
+              </td>
+              <td class="purchase-order-cost-column">
+                <input
+                  v-model.number="item.unitCost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  :aria-label="`ต้นทุนต่อหน่วย ${item.name}`"
+                />
+                <small
+                  v-if="item.unitCost > item.price"
+                  class="purchase-cost-warning"
+                  >สูงกว่าต้นทุนเดิม ฿{{
+                    Number(item.price).toLocaleString("th-TH")
+                  }}</small
+                >
+              </td>
+              <td class="purchase-order-action-column">
+                <button
+                  type="button"
+                  class="icon-button purchase-order-remove"
+                  title="ลบรายการ"
+                  :aria-label="`ลบ ${item.name}`"
+                  @click="removePurchaseOrderItem(item.sku)"
+                >
+                  <SvgIcon name="close" size="16" />
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="empty-state">ไม่มีรายการที่เลือก</p>
+      </div>
+      <template #footer-pagination>
+        <TablePagination
+          :total="purchaseOrderItems.length"
+          label="รายการสินค้า"
+        />
+      </template>
+      <template #actions>
+        <button
+          type="button"
+          class="button secondary"
+          @click="showPurchaseOrderModal = false"
+        >
+          กลับไปแก้ไข
+        </button>
+        <button
+          type="submit"
+          class="button primary"
+          :disabled="!purchaseOrderItems.length"
+        >
+          สร้างรายการสั่งซื้อ
+        </button>
+      </template>
+    </InventoryFormModal>
     <div v-if="toast" class="toast" role="status" aria-live="polite">
       <span class="toast-icon"><SvgIcon name="check" /></span>
-      <div class="toast-content"><strong>{{ toast.title }}</strong><span>{{ toast.message }}</span></div>
-      <button class="toast-close" type="button" aria-label="ปิดการแจ้งเตือน" @click="toast = null">
+      <div class="toast-content">
+        <strong>{{ toast.title }}</strong
+        ><span>{{ toast.message }}</span>
+      </div>
+      <button
+        class="toast-close"
+        type="button"
+        aria-label="ปิดการแจ้งเตือน"
+        @click="toast = null"
+      >
         <SvgIcon name="close" size="16" />
       </button>
     </div>
-    <div v-if="showReceiveModal" class="modal-backdrop" @click.self="showReceiveModal = false">
-      <form class="modal receive-stock-modal" @submit.prevent="receiveStock">
-        <div class="modal-heading">
-          <div>
-            <span class="eyebrow">STOCK RECEIPT</span>
-            <h2>เติมสินค้าเข้าคลัง</h2>
-          </div>
-          <button type="button" class="icon-button" title="ปิด" @click="showReceiveModal = false">
-            <SvgIcon name="close" />
+    <InventoryFormModal
+      v-if="showReceiveModal"
+      eyebrow="STOCK RECEIPT"
+      title="เติมสินค้าเข้าคลัง"
+      modal-class="receive-stock-modal"
+      @close="showReceiveModal = false"
+      @submit="receiveStock"
+    >
+      <div v-if="receivingProduct" class="receive-product-summary">
+        <span class="sku-code">{{ receivingProduct.sku }}</span>
+        <div>
+          <strong>{{ receivingProduct.name }}</strong
+          ><small
+            >คงเหลือ {{ receivingProduct.stock.toLocaleString("th-TH") }}
+            {{ receivingProduct.unit }}</small
+          >
+        </div>
+      </div>
+      <label
+        >จำนวนที่รับเข้า ({{ receivingProduct?.unit || "หน่วย" }})
+        <input
+          v-model.number="receiveAmount"
+          type="number"
+          min="1"
+          step="1"
+          required
+          autofocus
+        />
+      </label>
+      <div class="quantity-shortcuts" aria-label="เลือกจำนวนด่วน">
+        <span>เลือกจำนวนด่วน</span>
+        <div>
+          <button
+            v-for="amount in [1, 5, 10, 20]"
+            :key="amount"
+            type="button"
+            :class="{ selected: receiveAmount === amount }"
+            @click="receiveAmount = amount"
+          >
+            +{{ amount }}
           </button>
         </div>
-        <div v-if="receivingProduct" class="receive-product-summary">
-          <span class="sku-code">{{ receivingProduct.sku }}</span>
-          <div><strong>{{ receivingProduct.name }}</strong><small>คงเหลือ {{ receivingProduct.stock.toLocaleString("th-TH") }} {{ receivingProduct.unit }}</small></div>
-        </div>
-        <label>จำนวนที่รับเข้า ({{ receivingProduct?.unit || "หน่วย" }})
-          <input v-model.number="receiveAmount" type="number" min="1" step="1" required autofocus />
-        </label>
-        <div class="quantity-shortcuts" aria-label="เลือกจำนวนด่วน">
-          <span>เลือกจำนวนด่วน</span>
-          <div>
-            <button v-for="amount in [1, 5, 10, 20]" :key="amount" type="button" :class="{ selected: receiveAmount === amount }" @click="receiveAmount = amount">+{{ amount }}</button>
-          </div>
-        </div>
-        <label>ต้นทุนต่อหน่วยของล็อตใหม่<input v-model.number="receiveUnitCost" type="number" min="0" step="0.01" required /></label>
-        <p class="form-helper">ต้นทุนล็อตเดิมจะไม่ถูกเขียนทับ ระบบจะคำนวณต้นทุนเฉลี่ยถ่วงน้ำหนักเมื่อรับของเข้า</p>
-        <div class="button-row end">
-          <button type="button" class="button secondary" @click="showReceiveModal = false">ยกเลิก</button>
-          <button type="submit" class="button primary"><SvgIcon name="plus" />ยืนยันการเติมสินค้า</button>
-        </div>
-      </form>
-    </div>
+      </div>
+      <label
+        >ต้นทุนต่อหน่วยของล็อตใหม่<input
+          v-model.number="receiveUnitCost"
+          type="number"
+          min="0"
+          step="0.01"
+          required
+      /></label>
+      <p class="form-helper">
+        ต้นทุนล็อตเดิมจะไม่ถูกเขียนทับ
+        ระบบจะคำนวณต้นทุนเฉลี่ยถ่วงน้ำหนักเมื่อรับของเข้า
+      </p>
+      <template #actions>
+        <button
+          type="button"
+          class="button secondary"
+          @click="showReceiveModal = false"
+        >
+          ยกเลิก
+        </button>
+        <button type="submit" class="button primary">
+          <SvgIcon name="plus" />ยืนยันการเติมสินค้า
+        </button>
+      </template>
+    </InventoryFormModal>
     <div
       v-if="showModal"
       class="modal-backdrop"
@@ -569,16 +934,28 @@ function createPurchaseOrder() {
               required
               placeholder="ชื่อสินค้าและรุ่น" /></label
           ><label
-            >หมวดหมู่<div class="category-select-row">
-              <select v-model="form.category" required>
-                <option disabled value="">เลือกหมวดหมู่สินค้า</option>
-                <option v-for="item in categories.slice(1)" :key="item">
-                  {{ item }}
-                </option>
-              </select>
-              <button type="button" class="button secondary" @click="openCategoryModal">
-                <SvgIcon name="plus" />เพิ่ม
-              </button>
+            >หมวดหมู่
+            <div class="category-select-row">
+              <AppSelect
+                v-model="form.category"
+                :options="categories.slice(1)"
+                placeholder="เลือกหมวดหมู่สินค้า"
+                aria-label="เลือกหมวดหมู่สินค้า"
+                required
+              >
+                <template #menu-footer="{ close }">
+                  <button
+                    type="button"
+                    class="app-select-add-action"
+                    @click.stop="
+                      close();
+                      openCategoryModal();
+                    "
+                  >
+                    <SvgIcon name="plus" size="15" />เพิ่มหมวดหมู่
+                  </button>
+                </template>
+              </AppSelect>
             </div></label
           ><label
             >หน่วยนับ<input
@@ -593,24 +970,54 @@ function createPurchaseOrder() {
             >Reorder Point<input
               v-model="form.reorderPoint"
               type="number"
-              min="0" /><small class="field-helper">แจ้งเตือนเมื่อ Stock ปัจจุบันน้อยกว่าหรือเท่ากับค่านี้</small></label
+              min="0"
+            /><small class="field-helper"
+              >แจ้งเตือนเมื่อ Stock ปัจจุบันน้อยกว่าหรือเท่ากับค่านี้</small
+            ></label
           ><label
-            >ราคาต่อหน่วย<input
+            >ต้นทุนล่าสุดต่อหน่วย<input
               v-model="form.price"
               type="number"
               min="0" /></label
           ><label
-            >ซัพพลายเออร์<div class="category-select-row">
-              <select v-model="form.supplier" required>
-                <option disabled value="">เลือกซัพพลายเออร์</option>
-                <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.name">
-                  {{ supplier.name }}
-                </option>
-              </select>
-              <button type="button" class="button secondary" @click="goToSupplierManagement">
-                <SvgIcon name="plus" />เพิ่ม
-              </button>
-            </div></label>
+            >ราคาขายต่อหน่วย<input
+              v-model="form.salePrice"
+              type="number"
+              min="0"
+              required
+            /><small class="field-helper"
+              >ใช้เทียบกำไรกับต้นทุนล่าสุดและต้นทุนเฉลี่ย</small
+            ></label
+          ><label
+            >ซัพพลายเออร์
+            <div class="category-select-row">
+              <AppSelect
+                v-model="form.supplier"
+                :options="
+                  suppliers.map((supplier) => ({
+                    value: supplier.name,
+                    label: supplier.name,
+                  }))
+                "
+                placeholder="เลือกซัพพลายเออร์"
+                aria-label="เลือกซัพพลายเออร์"
+                required
+              >
+                <template #menu-footer="{ close }">
+                  <button
+                    type="button"
+                    class="app-select-add-action"
+                    @click.stop="
+                      close();
+                      goToSupplierManagement();
+                    "
+                  >
+                    <SvgIcon name="plus" size="15" />เพิ่มซัพพลายเออร์
+                  </button>
+                </template>
+              </AppSelect>
+            </div></label
+          >
         </div>
         <div class="button-row end">
           <button
@@ -625,21 +1032,43 @@ function createPurchaseOrder() {
         </div>
       </form>
     </div>
-    <div v-if="showCategoryModal" class="modal-backdrop" @click.self="showCategoryModal = false">
+    <div
+      v-if="showCategoryModal"
+      class="modal-backdrop"
+      @click.self="showCategoryModal = false"
+    >
       <form class="modal category-modal" @submit.prevent="saveCategory">
         <div class="modal-heading">
           <div>
             <span class="eyebrow">PRODUCT CATEGORY</span>
             <h2>เพิ่มหมวดหมู่สินค้า</h2>
           </div>
-          <button type="button" class="icon-button" title="ปิด" @click="showCategoryModal = false">
+          <button
+            type="button"
+            class="icon-button"
+            title="ปิด"
+            @click="showCategoryModal = false"
+          >
             <SvgIcon name="close" />
           </button>
         </div>
-        <label>ชื่อหมวดหมู่ใหม่<input v-model="newCategoryName" required placeholder="เช่น แบตเตอรี่และระบบกักเก็บพลังงาน" /></label>
-        <p class="form-helper">หมวดหมู่จะถูกบันทึกลงฐานข้อมูลและพร้อมเลือกใช้ทันที</p>
+        <label
+          >ชื่อหมวดหมู่ใหม่<input
+            v-model="newCategoryName"
+            required
+            placeholder="เช่น แบตเตอรี่และระบบกักเก็บพลังงาน"
+        /></label>
+        <p class="form-helper">
+          หมวดหมู่จะถูกบันทึกลงฐานข้อมูลและพร้อมเลือกใช้ทันที
+        </p>
         <div class="button-row end">
-          <button type="button" class="button secondary" @click="showCategoryModal = false">ยกเลิก</button>
+          <button
+            type="button"
+            class="button secondary"
+            @click="showCategoryModal = false"
+          >
+            ยกเลิก
+          </button>
           <button type="submit" class="button primary">บันทึกหมวดหมู่</button>
         </div>
       </form>

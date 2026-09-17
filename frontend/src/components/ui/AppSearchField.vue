@@ -14,6 +14,11 @@ defineProps({
 <template>
   <div class="control-field control-field--search" :class="className">
     <SvgIcon name="search" aria-hidden="true" />
-    <input v-model="model" type="search" :placeholder="placeholder" :aria-label="label" />
+    <input
+      v-model="model"
+      type="search"
+      :placeholder="placeholder"
+      :aria-label="label"
+    />
   </div>
 </template>

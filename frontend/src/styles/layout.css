@@ -53,7 +53,9 @@
   background: transparent;
 }
 .brand-logo {
-  transition: transform 180ms ease, color 180ms ease;
+  transition:
+    transform 180ms ease,
+    color 180ms ease;
 }
 .header-brand:hover .brand-logo {
   color: #2563eb;

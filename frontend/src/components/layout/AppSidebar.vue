@@ -7,22 +7,32 @@ const props = defineProps({ collapsed: { type: Boolean, default: false } });
 const emit = defineEmits(["toggle-sidebar"]);
 
 const groups = [
-  { label: "ข้อมูลตั้งต้น", items: [
-    { to: "/inventory", label: "คลังสินค้า", icon: "box" },
-    { to: "/suppliers", label: "ซัพพลายเออร์", icon: "truck" },
-  ] },
-  { label: "ลูกค้าและการขาย", items: [
-    { to: "/sales", label: "การขาย & ใบเสนอราคา", icon: "quote" },
-    { to: "/customers", label: "ลูกค้า", icon: "user" },
-  ] },
-  { label: "งานหน้างาน", items: [
-    { to: "/installations", label: "การติดตั้ง", icon: "solar" },
-    { to: "/service", label: "บริการหลังการขาย", icon: "headset" },
-    { to: "/fuel-claims", label: "เบิกค่าน้ำมัน", icon: "wallet" },
-  ] },
-  { label: "ทีมงาน", items: [
-    { to: "/payroll", label: "ข้อมูลพนักงาน", icon: "briefcase" },
-  ] },
+  {
+    label: "ข้อมูลตั้งต้น",
+    items: [
+      { to: "/inventory", label: "คลังสินค้า", icon: "box" },
+      { to: "/suppliers", label: "ซัพพลายเออร์", icon: "truck" },
+    ],
+  },
+  {
+    label: "ลูกค้าและการขาย",
+    items: [
+      { to: "/sales", label: "การขาย & ใบเสนอราคา", icon: "quote" },
+      { to: "/customers", label: "ลูกค้า", icon: "user" },
+    ],
+  },
+  {
+    label: "งานหน้างาน",
+    items: [
+      { to: "/installations", label: "การติดตั้ง", icon: "solar" },
+      { to: "/service", label: "บริการหลังการขาย", icon: "headset" },
+      { to: "/fuel-claims", label: "เบิกค่าน้ำมัน", icon: "wallet" },
+    ],
+  },
+  {
+    label: "ทีมงาน",
+    items: [{ to: "/payroll", label: "ข้อมูลพนักงาน", icon: "briefcase" }],
+  },
 ];
 </script>
 
@@ -53,7 +63,9 @@ const groups = [
             :aria-label="item.label"
             :title="props.collapsed ? item.label : undefined"
             active-class="active"
-            ><SvgIcon :name="item.icon" /><span>{{ item.label }}</span></RouterLink
+            ><SvgIcon :name="item.icon" /><span>{{
+              item.label
+            }}</span></RouterLink
           >
         </nav>
       </div>

@@ -54,18 +54,20 @@
   gap: 16px;
 }
 .pagination-controls label {
+  flex-direction: row;
   gap: 8px;
   white-space: nowrap;
 }
-.pagination-controls select {
-  min-width: 64px;
-  height: 32px;
-  padding: 0 26px 0 10px;
-  color: var(--text);
+.page-size-field {
+  width: 72px;
+  min-height: var(--control-height);
+  padding: 9px 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--control-radius);
+  color: var(--text);
   background: #fff;
   font: inherit;
+  font-weight: 700;
 }
 .page-navigation {
   overflow: hidden;
@@ -104,7 +106,8 @@
   opacity: 0.42;
 }
 .page-navigation button:focus-visible,
-.pagination-controls select:focus-visible {
+.pagination-controls input:focus-visible,
+.page-size-field:focus-visible {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
 }

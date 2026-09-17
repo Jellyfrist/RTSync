@@ -72,6 +72,11 @@
   color: var(--muted);
   font-size: 11px;
 }
+.user-menu-role {
+  color: var(--primary) !important;
+  font-size: 10px !important;
+  font-weight: 700;
+}
 .user-menu-popover {
   position: absolute;
   top: calc(100% + 8px);

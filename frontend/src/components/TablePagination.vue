@@ -9,10 +9,23 @@ const props = defineProps({
 
 const page = ref(1);
 const pageSize = ref(10);
-const totalPages = computed(() => Math.max(1, Math.ceil(props.total / pageSize.value)));
-const start = computed(() => (props.total ? (page.value - 1) * pageSize.value + 1 : 0));
-const end = computed(() => Math.min(page.value * pageSize.value, props.total));
+const pageSizeValue = computed(() =>
+  Math.min(1000, Math.max(1, Number(pageSize.value) || 1)),
+);
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(props.total / pageSizeValue.value)),
+);
+const start = computed(() =>
+  props.total ? (page.value - 1) * pageSizeValue.value + 1 : 0,
+);
+const end = computed(() =>
+  Math.min(page.value * pageSizeValue.value, props.total),
+);
 
+function commitPageSize() {
+  pageSize.value = pageSizeValue.value;
+  page.value = 1;
+}
 watch([() => props.total, pageSize], () => {
   page.value = Math.min(page.value, totalPages.value);
 });
@@ -22,20 +35,36 @@ watch([() => props.total, pageSize], () => {
   <nav class="table-pagination" :aria-label="`การแบ่งหน้า${label}`">
     <p>แสดง {{ start }}–{{ end }} จาก {{ total }} {{ label }}</p>
     <div class="pagination-controls">
-      <label>
+      <label class="page-size-control">
         <span>แถวต่อหน้า</span>
-        <select v-model="pageSize" aria-label="จำนวนแถวต่อหน้า">
-          <option :value="10">10</option>
-          <option :value="25">25</option>
-          <option :value="50">50</option>
-        </select>
+        <input
+          class="page-size-field"
+          v-model.number="pageSize"
+          type="number"
+          min="1"
+          max="1000"
+          inputmode="numeric"
+          aria-label="จำนวนแถวต่อหน้า"
+          @change="commitPageSize"
+          @blur="commitPageSize"
+        />
       </label>
       <div class="page-navigation" aria-label="เปลี่ยนหน้า">
-        <button type="button" :disabled="page === 1" aria-label="หน้าก่อนหน้า" @click="page -= 1">
+        <button
+          type="button"
+          :disabled="page === 1"
+          aria-label="หน้าก่อนหน้า"
+          @click="page -= 1"
+        >
           <SvgIcon name="chevron-left" :size="16" />
         </button>
         <span aria-current="page">{{ page }}</span>
-        <button type="button" :disabled="page === totalPages" aria-label="หน้าถัดไป" @click="page += 1">
+        <button
+          type="button"
+          :disabled="page === totalPages"
+          aria-label="หน้าถัดไป"
+          @click="page += 1"
+        >
           <SvgIcon name="chevron-right" :size="16" />
         </button>
       </div>

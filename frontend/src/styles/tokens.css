@@ -1,8 +1,10 @@
 /* ==================================================
    01. RESET & GLOBAL
    ================================================== */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Kanit:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap");
 :root {
+  --font-sans: "Noto Sans Thai", Tahoma, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --primary: #1e3a8a;
   --primary-hover: #1d4ed8;
   --secondary: #0284c7;
