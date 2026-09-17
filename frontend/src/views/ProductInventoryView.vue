@@ -472,7 +472,8 @@ function createPurchaseOrder() {
               <th>หมวดหมู่</th>
               <th>คงเหลือ</th>
               <th>Reorder Point</th>
-              <th>ต้นทุน / ราคาขาย</th>
+              <th>ต้นทุนล่าสุด</th>
+              <th>ราคาขาย</th>
               <th>สถานะ</th>
               <th>จัดการ</th>
             </tr>
@@ -501,8 +502,11 @@ function createPurchaseOrder() {
                   >เฉลี่ยถ่วงน้ำหนัก
                   {{ formattedMoney(getWeightedAverageCost(product)) }}</small
                 >
-                <small class="table-subtext pricing-meta"
-                  >ขาย {{ formattedMoney(getProductSalePrice(product)) }}</small
+              </td>
+              <td class="inventory-pricing-cell inventory-sale-price-cell">
+                <strong
+                  >ราคาขาย
+                  {{ formattedMoney(getProductSalePrice(product)) }}</strong
                 >
                 <small
                   class="table-subtext pricing-meta"

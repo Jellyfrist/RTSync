@@ -129,6 +129,8 @@ const visibleCustomers = computed(() =>
 );
 const customerTypeOptions = computed(() => ["ทั้งหมด", ...customerTypes.value]);
 const customerStatusOptions = mockDb.get("customerStatuses");
+const customerStatusClass = (status) =>
+  status === "ชำระครบถ้วน" ? "success-tag" : "warning-tag";
 const residentialCustomers = computed(
   () =>
     customers.value.filter((customer) => customer.type === "บ้านพักอาศัย")
@@ -153,6 +155,10 @@ const selectCustomer = (id) => {
   receiptIssued.value = false;
 };
 const showNotice = (message) => window.alert(message);
+function updateCustomerStatus(customer) {
+  mockDb.set("customers", customers.value);
+  showNotice(`อัปเดตสถานะบัญชี ${customer.name} แล้ว`);
+}
 const showCustomerTypeModal = ref(false);
 const newCustomerType = ref("");
 function openCreateCustomer() {
@@ -307,21 +313,23 @@ function issueReceipt() {
           placeholder="ค้นหาชื่อลูกค้า, รหัสลูกค้า, เบอร์โทรศัพท์..."
           label="ค้นหาลูกค้า"
         />
-        <div class="table-filter-select control-field">
-          <span>ประเภทลูกค้า</span
-          ><select v-model="selectedType" aria-label="กรองประเภทลูกค้า">
-            <option v-for="type in customerTypeOptions" :key="type">
-              {{ type }}
-            </option>
-          </select>
+        <div class="table-filter-select control-field app-select-filter">
+          <span>ประเภทลูกค้า</span>
+          <AppSelect
+            v-model="selectedType"
+            :options="customerTypeOptions"
+            search-placeholder="ค้นหาประเภทลูกค้า"
+            aria-label="กรองประเภทลูกค้า"
+          />
         </div>
-        <div class="table-filter-select control-field">
-          <span>สถานะ</span
-          ><select v-model="selectedStatus" aria-label="กรองสถานะลูกค้า">
-            <option v-for="status in customerStatusOptions" :key="status">
-              {{ status }}
-            </option>
-          </select>
+        <div class="table-filter-select control-field app-select-filter">
+          <span>สถานะ</span>
+          <AppSelect
+            v-model="selectedStatus"
+            :options="customerStatusOptions"
+            search-placeholder="ค้นหาสถานะลูกค้า"
+            aria-label="กรองสถานะลูกค้า"
+          />
         </div>
       </div>
       <div class="table-scroll supplier-directory-table-wrap">
@@ -368,15 +376,21 @@ function issueReceipt() {
                 <td class="supplier-description">{{ customer.location }}</td>
                 <td>{{ customer.type || "—" }}</td>
                 <td>
-                  <span
-                    :class="
-                      customer.status === 'ชำระครบถ้วน'
-                        ? 'success-tag'
-                        : 'warning-tag'
-                    "
+                  <select
+                    class="table-status-select"
+                    :class="customerStatusClass(customer.status)"
+                    v-model="customer.status"
+                    aria-label="เลือกสถานะบัญชีลูกค้า"
+                    @click.stop
+                    @change="updateCustomerStatus(customer)"
                   >
-                    {{ customer.status || "ยังไม่ระบุ" }}
-                  </span>
+                    <option
+                      v-for="status in customerStatusOptions.slice(1)"
+                      :key="status"
+                    >
+                      {{ status }}
+                    </option>
+                  </select>
                 </td>
                 <td class="supplier-table-action">
                   <button

@@ -133,6 +133,21 @@
 .customer-filter-row .filter-tabs {
   margin: 0;
 }
+.employee-directory-table {
+  min-width: 1080px;
+}
+.employee-directory-table th:last-child,
+.employee-directory-table td:last-child {
+  width: 112px;
+}
+.employee-table-action {
+  text-align: right;
+  white-space: nowrap;
+}
+.table-edit-button {
+  min-width: 82px;
+  padding-inline: 11px;
+}
 .customer-directory-table {
   min-width: 1080px;
 }
@@ -204,15 +219,23 @@
   color: var(--muted);
   font-size: 11px;
 }
-.supplier-product-link select {
+.supplier-product-link .supplier-product-select {
+  width: min(300px, 100%);
+}
+.supplier-product-link .supplier-product-select .app-select-trigger {
   min-height: var(--control-height);
-  max-width: 280px;
-  padding: 9px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--control-radius);
-  background: #fff;
-  color: var(--text);
-  font-size: 12px;
+}
+.supplier-product-link > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.supplier-product-link > .button-row {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+.supplier-product-action {
+  width: 56px;
+  text-align: right;
 }
 .button:disabled {
   cursor: not-allowed;
@@ -817,6 +840,46 @@
   background: transparent;
   font: inherit;
   font-size: 12px;
+}
+.employee-role-filter {
+  padding: 0 8px 0 14px;
+}
+.employee-role-filter > span {
+  flex: 0 0 auto;
+}
+.employee-role-filter > .app-select {
+  flex: 1 1 auto;
+  min-width: 118px;
+}
+.employee-role-filter .app-select-trigger {
+  min-height: calc(var(--control-height) - 2px);
+  padding: 9px 2px 9px 10px;
+  border: 0;
+  border-radius: 0;
+}
+.employee-role-filter .app-select.is-open .app-select-trigger {
+  border: 0;
+  box-shadow: none;
+}
+.app-select-filter {
+  padding: 0 8px 0 14px;
+}
+.app-select-filter > span {
+  flex: 0 0 auto;
+}
+.app-select-filter > .app-select {
+  flex: 1 1 auto;
+  min-width: 118px;
+}
+.app-select-filter .app-select-trigger {
+  min-height: calc(var(--control-height) - 2px);
+  padding: 9px 2px 9px 10px;
+  border: 0;
+  border-radius: 0;
+}
+.app-select-filter .app-select.is-open .app-select-trigger {
+  border: 0;
+  box-shadow: none;
 }
 .task-overview-grid {
   display: grid;

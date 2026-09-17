@@ -328,11 +328,23 @@
   font-weight: 500;
 }
 .inventory-pricing-cell {
-  min-width: 190px;
+  min-width: 175px;
+  padding-top: 15px !important;
+  padding-bottom: 15px !important;
   font-variant-numeric: tabular-nums;
+  vertical-align: top;
 }
 .inventory-pricing-cell > strong {
   display: block;
+  margin-bottom: 7px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+.inventory-pricing-cell > .pricing-meta {
+  display: block;
+  margin-top: 4px;
+  line-height: 1.5;
+  white-space: nowrap;
 }
 .pricing-danger {
   color: #b91c1c;
@@ -562,6 +574,12 @@
 .supplier-page .supplier-workspace {
   padding: 0;
 }
+.supplier-page .supplier-workspace > .table-pagination,
+.supplier-page .purchase-orders-panel > .table-pagination {
+  margin: 0;
+  padding: 10px 20px;
+  border-top: 1px solid #eef2f7;
+}
 .supplier-page .supplier-table-toolbar {
   margin: 0 20px 18px;
   align-items: stretch;
@@ -631,9 +649,8 @@
   margin: 16px 20px 0;
 }
 .purchase-orders-panel > .table-pagination {
-  margin: 16px 0 0;
-  padding: 14px 20px 0;
-  border-top: 1px solid #eef2f7;
+  margin: 0;
+  padding: 10px 20px;
 }
 .quotation-section > .sales-layout {
   margin: 20px;

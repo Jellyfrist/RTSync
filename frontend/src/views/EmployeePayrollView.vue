@@ -50,7 +50,7 @@ const visibleEmployees = computed(() =>
 );
 const roleOptions = computed(() => [
   "ทั้งหมด",
-  ...new Set(employees.value.map((item) => item.role).filter(Boolean)),
+  ...employeeRoleOptions.value.filter((role) => role !== "ทั้งหมด"),
 ]);
 const totalNetPayroll = computed(() =>
   employees.value.reduce(
@@ -111,8 +111,9 @@ function saveRole() {
   showRoleModal.value = false;
   notify(`เพิ่มตำแหน่ง ${role} แล้ว`);
 }
-function openEdit() {
-  const e = activeEmployee.value;
+function openEdit(employee = activeEmployee.value) {
+  const e = employee;
+  if (!e) return;
   form.value = {
     name: e.name,
     role: e.role,
@@ -197,11 +198,14 @@ function calculatePayroll() {
           placeholder="ค้นหาชื่อพนักงาน รหัส หรือ ตำแหน่ง..."
           label="ค้นหาพนักงาน"
         />
-        <div class="table-filter-select control-field">
-          <span>ตำแหน่ง</span
-          ><select v-model="roleFilter" aria-label="กรองตำแหน่งพนักงาน">
-            <option v-for="role in roleOptions" :key="role">{{ role }}</option>
-          </select>
+        <div class="table-filter-select control-field employee-role-filter">
+          <span>ตำแหน่ง</span>
+          <AppSelect
+            v-model="roleFilter"
+            :options="roleOptions"
+            search-placeholder="ค้นหาตำแหน่ง"
+            aria-label="กรองตำแหน่งพนักงาน"
+          />
         </div>
       </div>
       <div class="table-scroll employee-directory-table-wrap">
@@ -213,24 +217,12 @@ function calculatePayroll() {
               <th>ตำแหน่ง</th>
               <th>เงินเดือนพื้นฐาน</th>
               <th>สถานะ</th>
-              <th aria-label="เปิดรายละเอียด"></th>
+              <th aria-label="การจัดการ"></th>
             </tr>
           </thead>
           <tbody>
             <template v-for="employee in visibleEmployees" :key="employee.id">
-              <tr
-                class="employee-directory-row"
-                :class="{ selected: activeId === employee.id }"
-                :aria-expanded="activeId === employee.id"
-                tabindex="0"
-                @click="activeId = activeId === employee.id ? '' : employee.id"
-                @keydown.enter.prevent="
-                  activeId = activeId === employee.id ? '' : employee.id
-                "
-                @keydown.space.prevent="
-                  activeId = activeId === employee.id ? '' : employee.id
-                "
-              >
+              <tr class="employee-directory-row">
                 <td>
                   <span class="code-tag">{{ employee.id }}</span>
                 </td>
@@ -250,64 +242,13 @@ function calculatePayroll() {
                 <td><span class="success-tag">กำลังทำงาน</span></td>
                 <td class="employee-table-action">
                   <button
-                    class="icon-button"
-                    :aria-label="`ดูรายละเอียด ${employee.name}`"
-                    @click.stop="
-                      activeId = activeId === employee.id ? '' : employee.id
-                    "
+                    class="button secondary table-edit-button"
+                    type="button"
+                    :aria-label="`แก้ไขข้อมูล ${employee.name}`"
+                    @click="openEdit(employee)"
                   >
-                    <SvgIcon name="chevron-right" size="20" />
+                    <SvgIcon name="edit" size="16" />แก้ไข
                   </button>
-                </td>
-              </tr>
-              <tr v-if="activeId === employee.id" class="employee-detail-row">
-                <td colspan="6">
-                  <div class="detail-card employee-inline-detail">
-                    <div class="detail-heading">
-                      <div>
-                        <span class="code-tag">{{ employee.id }}</span>
-                        <h2>{{ employee.name }}</h2>
-                        <p>{{ employee.role }}</p>
-                      </div>
-                      <button
-                        class="button secondary"
-                        type="button"
-                        @click.stop="openEdit"
-                      >
-                        <SvgIcon name="edit" />แก้ไขข้อมูล
-                      </button>
-                    </div>
-                    <div class="info-grid">
-                      <div>
-                        <small>เบอร์โทรศัพท์</small
-                        ><strong>{{ employee.phone || "ยังไม่ระบุ" }}</strong>
-                      </div>
-                      <div>
-                        <small>อีเมล</small
-                        ><strong>{{ employee.email || "ยังไม่ระบุ" }}</strong>
-                      </div>
-                      <div>
-                        <small>วันที่เริ่มงาน</small
-                        ><strong>{{
-                          employee.startDate || "ยังไม่ระบุ"
-                        }}</strong>
-                      </div>
-                      <div>
-                        <small>เงินเดือนพื้นฐาน</small
-                        ><strong>{{ money(employee.salary) }}</strong>
-                      </div>
-                      <div>
-                        <small>ค่าจ้างสุทธิ</small
-                        ><strong class="text-success">{{
-                          money(
-                            employee.salary +
-                              employee.allowance -
-                              employee.deduction,
-                          )
-                        }}</strong>
-                      </div>
-                    </div>
-                  </div>
                 </td>
               </tr>
             </template>

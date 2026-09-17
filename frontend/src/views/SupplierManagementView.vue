@@ -42,6 +42,7 @@ const showSupplierCategoryFilter = ref(false);
 const supplierCategoryFilter = ref("ทั้งหมด");
 const supplierCategoryFilterQuery = ref("");
 const purchaseOrderStatuses = mockDb.get("purchaseOrderStatuses");
+const showPurchaseHistory = ref(false);
 const visibleSuppliers = computed(() =>
   suppliers.value.filter(
     (item) =>
@@ -181,6 +182,10 @@ function assignProduct() {
   product.supplierId = selectedId.value;
   mockDb.set("products", products.value);
   productToAssign.value = "";
+}
+function removeSupplierProduct(product) {
+  product.supplierId = "";
+  mockDb.set("products", products.value);
 }
 function selectSupplierCategory(category) {
   supplierCategoryFilter.value = category;
@@ -383,8 +388,14 @@ function completePurchaseOrder(order) {
                           <h2>{{ supplier.name }}</h2>
                           <p>{{ supplier.description }}</p>
                         </div>
-                        <button class="button secondary" @click="openEdit">
-                          <SvgIcon name="edit" />แก้ไขข้อมูล
+                        <button
+                          class="icon-button"
+                          type="button"
+                          title="แก้ไขข้อมูลซัพพลายเออร์"
+                          aria-label="แก้ไขข้อมูลซัพพลายเออร์"
+                          @click="openEdit"
+                        >
+                          <SvgIcon name="edit" size="17" />
                         </button>
                       </div>
                       <div class="info-grid">
@@ -430,6 +441,7 @@ function completePurchaseOrder(order) {
                             <th>รายการสินค้า</th>
                             <th>ราคา</th>
                             <th>สถานะ</th>
+                            <th>จัดการ</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -458,9 +470,20 @@ function completePurchaseOrder(order) {
                                 >{{ product.status }}</span
                               >
                             </td>
+                            <td class="supplier-product-action">
+                              <button
+                                class="icon-button"
+                                type="button"
+                                title="เอาสินค้าออกจากซัพพลายเออร์"
+                                :aria-label="`เอา ${product.name} ออกจากซัพพลายเออร์`"
+                                @click="removeSupplierProduct(product)"
+                              >
+                                <SvgIcon name="close" size="16" />
+                              </button>
+                            </td>
                           </tr>
                           <tr v-if="!supplierProducts.length">
-                            <td colspan="4" class="empty-state">
+                            <td colspan="5" class="empty-state">
                               ยังไม่มีสินค้าที่ผูกกับซัพพลายเออร์รายนี้
                             </td>
                           </tr>
@@ -479,20 +502,22 @@ function completePurchaseOrder(order) {
                           >
                         </div>
                         <div class="button-row">
-                          <select
+                          <AppSelect
                             v-model="productToAssign"
+                            class="supplier-product-select"
+                            :options="
+                              unassignedProducts.map((product) => ({
+                                value: product.sku,
+                                label: `${product.sku} · ${product.name}`,
+                              }))
+                            "
+                            placeholder="เลือกสินค้า"
+                            search-placeholder="ค้นหาสินค้า หรือ SKU"
                             aria-label="เลือกสินค้าที่จะผูก"
-                          >
-                            <option value="">เลือกสินค้า</option>
-                            <option
-                              v-for="product in unassignedProducts"
-                              :key="product.sku"
-                              :value="product.sku"
-                            >
-                              {{ product.sku }} · {{ product.name }}
-                            </option></select
-                          ><button
+                          />
+                          <button
                             class="button secondary"
+                            type="button"
                             :disabled="!productToAssign"
                             @click="assignProduct"
                           >
@@ -520,6 +545,17 @@ function completePurchaseOrder(order) {
               รายการที่สร้างจาก Reorder Point และส่งต่อให้ทีมจัดซื้อ
             </p>
           </div>
+          <button
+            class="button secondary"
+            type="button"
+            @click="showPurchaseHistory = !showPurchaseHistory"
+          >
+            {{
+              showPurchaseHistory
+                ? "ซ่อนประวัติการสั่งซื้อ"
+                : "ดูประวัติการสั่งซื้อ"
+            }}
+          </button>
         </div>
         <div v-if="activePurchaseOrders.length" class="purchase-orders-list">
           <article
@@ -573,57 +609,60 @@ function completePurchaseOrder(order) {
           :total="activePurchaseOrders.length"
           label="รายการสั่งซื้อ"
         />
-      </section>
-      <section class="panel purchase-orders-panel purchase-history-panel">
-        <div class="panel-toolbar purchase-orders-heading">
-          <div>
-            <h2 class="section-heading">ประวัติการสั่งซื้อ</h2>
-            <p class="section-caption">
-              รายการสั่งซื้อที่รับของและปิดรายการสำเร็จแล้ว
-            </p>
-          </div>
-          <span class="completed-jobs-count"
-            >{{ completedPurchaseOrders.length }} รายการ</span
-          >
-        </div>
-        <div v-if="completedPurchaseOrders.length" class="purchase-orders-list">
-          <article
-            v-for="order in completedPurchaseOrders"
-            :key="`history-${order.id}`"
-            class="purchase-order-summary"
-          >
-            <div class="purchase-order-summary-head">
-              <strong>{{ order.id }}</strong>
-              <span :class="orderStatusClass(order.status)">{{
-                order.status
-              }}</span>
+        <div v-if="showPurchaseHistory" class="purchase-history-panel">
+          <div class="panel-toolbar purchase-orders-heading">
+            <div>
+              <h3 class="section-heading">ประวัติการสั่งซื้อ</h3>
+              <p class="section-caption">
+                รายการสั่งซื้อที่รับของและปิดรายการสำเร็จแล้ว
+              </p>
             </div>
-            <small
-              >สร้างเมื่อ
-              {{ new Date(order.createdAt).toLocaleString("th-TH") }} ·
-              รับของเมื่อ
-              {{
-                order.completedAt
-                  ? new Date(order.completedAt).toLocaleString("th-TH")
-                  : "—"
-              }}</small
+            <span class="completed-jobs-count"
+              >{{ completedPurchaseOrders.length }} รายการ</span
             >
-            <ul>
-              <li v-for="item in order.items" :key="item.sku">
-                <span
-                  >{{ item.name }} <em>{{ item.sku }}</em></span
-                ><strong
-                  >{{ item.quantity ?? item.qty }} {{ item.unit }}</strong
-                >
-              </li>
-            </ul>
-          </article>
+          </div>
+          <div
+            v-if="completedPurchaseOrders.length"
+            class="purchase-orders-list"
+          >
+            <article
+              v-for="order in completedPurchaseOrders"
+              :key="`history-${order.id}`"
+              class="purchase-order-summary"
+            >
+              <div class="purchase-order-summary-head">
+                <strong>{{ order.id }}</strong>
+                <span :class="orderStatusClass(order.status)">{{
+                  order.status
+                }}</span>
+              </div>
+              <small
+                >สร้างเมื่อ
+                {{ new Date(order.createdAt).toLocaleString("th-TH") }} ·
+                รับของเมื่อ
+                {{
+                  order.completedAt
+                    ? new Date(order.completedAt).toLocaleString("th-TH")
+                    : "—"
+                }}</small
+              >
+              <ul>
+                <li v-for="item in order.items" :key="item.sku">
+                  <span
+                    >{{ item.name }} <em>{{ item.sku }}</em></span
+                  ><strong
+                    >{{ item.quantity ?? item.qty }} {{ item.unit }}</strong
+                  >
+                </li>
+              </ul>
+            </article>
+          </div>
+          <div v-else class="empty-state">ยังไม่มีรายการสั่งซื้อที่สำเร็จ</div>
+          <TablePagination
+            :total="completedPurchaseOrders.length"
+            label="ประวัติการสั่งซื้อ"
+          />
         </div>
-        <div v-else class="empty-state">ยังไม่มีรายการสั่งซื้อที่สำเร็จ</div>
-        <TablePagination
-          :total="completedPurchaseOrders.length"
-          label="ประวัติการสั่งซื้อ"
-        />
       </section>
     </div>
     <div v-if="isOpen" class="modal-backdrop" @click.self="close">

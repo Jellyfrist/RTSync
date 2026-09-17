@@ -289,12 +289,9 @@ function saveClaimEdit() {
   showEditModal.value = false;
   notify(`บันทึกรายละเอียด ${editingClaim.value.id} แล้ว`);
 }
-function cycleClaimStatus(claim) {
-  const flow = ["รอตรวจสอบ", "อนุมัติแล้ว", "รอเอกสาร", "ไม่อนุมัติ"];
-  const next = flow[(flow.indexOf(claim.status) + 1) % flow.length];
-  claim.status = next;
+function updateClaimStatus(claim) {
   mockDb.set("fuelClaims", claims.value);
-  notify(`${claim.id} เปลี่ยนสถานะเป็น ${next}`);
+  notify(`${claim.id} เปลี่ยนสถานะเป็น ${claim.status}`);
 }
 </script>
 
@@ -341,13 +338,14 @@ function cycleClaimStatus(claim) {
           placeholder="ค้นหาเลขที่เบิก งาน หรือพนักงาน..."
           label="ค้นหารายการเบิกค่าน้ำมัน"
         />
-        <div class="table-filter-select control-field">
+        <div class="table-filter-select control-field app-select-filter">
           <span>สถานะ</span>
-          <select v-model="claimStatusFilter" aria-label="กรองสถานะรายการเบิก">
-            <option v-for="status in claimStatusOptions" :key="status">
-              {{ status }}
-            </option>
-          </select>
+          <AppSelect
+            v-model="claimStatusFilter"
+            :options="claimStatusOptions"
+            search-placeholder="ค้นหาสถานะ"
+            aria-label="กรองสถานะรายการเบิก"
+          />
         </div>
       </div>
       <div class="table-scroll">
@@ -388,28 +386,30 @@ function cycleClaimStatus(claim) {
               <td>฿{{ formatCurrency(claim.amount) }}</td>
               <td>{{ claim.receipt }}</td>
               <td>
-                <span :class="statusClass(claim.status)">{{
-                  claim.status
-                }}</span>
+                <select
+                  class="table-status-select"
+                  :class="statusClass(claim.status)"
+                  v-model="claim.status"
+                  aria-label="เลือกสถานะรายการเบิก"
+                  @change="updateClaimStatus(claim)"
+                >
+                  <option
+                    v-for="status in claimStatusOptions.slice(1)"
+                    :key="status"
+                  >
+                    {{ status }}
+                  </option>
+                </select>
               </td>
               <td>
-                <div class="table-actions">
-                  <button
-                    class="button secondary table-button table-icon-button"
-                    title="แก้ไขรายละเอียดการเบิก"
-                    aria-label="แก้ไขรายละเอียดการเบิก"
-                    @click="openClaimEdit(claim)"
-                  >
-                    <SvgIcon name="edit" size="15" /></button
-                  ><button
-                    class="button status-action table-button"
-                    title="อัพเดตสถานะการเบิก"
-                    aria-label="อัพเดตสถานะการเบิก"
-                    @click="cycleClaimStatus(claim)"
-                  >
-                    <SvgIcon name="refresh" size="15" /><span>สถานะ</span>
-                  </button>
-                </div>
+                <button
+                  class="button secondary table-button table-icon-button"
+                  title="แก้ไขรายละเอียดการเบิก"
+                  aria-label="แก้ไขรายละเอียดการเบิก"
+                  @click="openClaimEdit(claim)"
+                >
+                  <SvgIcon name="edit" size="15" />
+                </button>
               </td>
             </tr>
             <tr v-if="!filteredClaims.length">

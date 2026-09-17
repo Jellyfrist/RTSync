@@ -136,6 +136,7 @@ const paymentStatusFilter = ref("ทั้งหมด");
 const orderStatusFilter = ref("ทั้งหมด");
 const paymentStatusOptions = mockDb.get("paymentStatuses");
 const orderStatusOptions = mockDb.get("orderStatuses");
+const orderStatusFilterOptions = ["ทั้งหมด", ...orderStatusOptions];
 const appointmentTimeOptions = mockDb.get("appointmentTimes");
 const closedSalesOrders = computed(() =>
   salesOrders.value
@@ -790,25 +791,23 @@ function createAppointment() {
           placeholder="ค้นหาเลขที่ขาย ชื่อลูกค้า หรือสินค้า..."
           label="ค้นหารายการขาย"
         />
-        <div class="table-filter-select control-field">
-          <span>สถานะคำสั่งซื้อ</span
-          ><select v-model="orderStatusFilter" aria-label="กรองสถานะคำสั่งซื้อ">
-            <option value="ทั้งหมด">ทั้งหมด</option>
-            <option v-for="status in orderStatusOptions" :key="status">
-              {{ status }}
-            </option>
-          </select>
+        <div class="table-filter-select control-field app-select-filter">
+          <span>สถานะคำสั่งซื้อ</span>
+          <AppSelect
+            v-model="orderStatusFilter"
+            :options="orderStatusFilterOptions"
+            search-placeholder="ค้นหาสถานะคำสั่งซื้อ"
+            aria-label="กรองสถานะคำสั่งซื้อ"
+          />
         </div>
-        <div class="table-filter-select control-field">
-          <span>สถานะการชำระเงิน</span
-          ><select
+        <div class="table-filter-select control-field app-select-filter">
+          <span>สถานะการชำระเงิน</span>
+          <AppSelect
             v-model="paymentStatusFilter"
+            :options="paymentStatusOptions"
+            search-placeholder="ค้นหาสถานะการชำระเงิน"
             aria-label="กรองสถานะการชำระเงิน"
-          >
-            <option v-for="status in paymentStatusOptions" :key="status">
-              {{ status }}
-            </option>
-          </select>
+          />
         </div>
       </div>
       <div class="table-scroll">
@@ -1423,16 +1422,14 @@ function createAppointment() {
           placeholder="ค้นหาเลขที่งาน ลูกค้า หรือพนักงาน..."
           label="ค้นหางานติดตั้ง"
         />
-        <div class="table-filter-select control-field">
-          <span>สถานะ</span
-          ><select
+        <div class="table-filter-select control-field app-select-filter">
+          <span>สถานะ</span>
+          <AppSelect
             v-model="appointmentStatusFilter"
+            :options="appointmentStatusOptions"
+            search-placeholder="ค้นหาสถานะงานติดตั้ง"
             aria-label="กรองสถานะงานติดตั้ง"
-          >
-            <option v-for="status in appointmentStatusOptions" :key="status">
-              {{ status }}
-            </option>
-          </select>
+          />
         </div>
       </div>
       <div class="table-scroll">
@@ -1480,23 +1477,14 @@ function createAppointment() {
                 </select>
               </td>
               <td>
-                <div class="table-actions">
-                  <button
-                    class="button secondary table-button table-icon-button"
-                    title="แก้ไขรายละเอียดงาน"
-                    aria-label="แก้ไขรายละเอียดงาน"
-                    @click="openEditModal(item, 'appointment')"
-                  >
-                    <SvgIcon name="edit" size="15" /></button
-                  ><button
-                    class="button secondary table-button close-job-button"
-                    title="ปิดงาน"
-                    aria-label="ปิดงาน"
-                    @click="closeAppointment(item)"
-                  >
-                    <SvgIcon name="check" size="15" /><span>ปิดงาน</span>
-                  </button>
-                </div>
+                <button
+                  class="button secondary table-button table-icon-button"
+                  title="แก้ไขรายละเอียดงาน"
+                  aria-label="แก้ไขรายละเอียดงาน"
+                  @click="openEditModal(item, 'appointment')"
+                >
+                  <SvgIcon name="edit" size="15" />
+                </button>
               </td>
             </tr>
             <tr v-if="!filteredAppointments.length">
@@ -1510,85 +1498,6 @@ function createAppointment() {
       <TablePagination
         :total="filteredAppointments.length"
         label="งานติดตั้ง"
-      />
-    </section>
-    <section
-      v-if="activeTab === 'appointments'"
-      class="operations-table-section completed-jobs-section"
-    >
-      <div class="task-table-heading">
-        <div>
-          <h2 class="section-heading">งานที่ปิดแล้ว</h2>
-          <p class="section-caption">
-            ประวัติงานติดตั้งที่ทีมดำเนินการเสร็จสิ้นแล้ว
-          </p>
-        </div>
-        <span class="completed-jobs-count"
-          >{{ closedAppointments.length }} งาน</span
-        >
-      </div>
-      <div class="table-scroll">
-        <table class="data-table operations-table">
-          <thead>
-            <tr>
-              <th>เลขที่งาน</th>
-              <th>ลูกค้า / สถานที่</th>
-              <th>กำหนดงาน</th>
-              <th>พนักงาน</th>
-              <th>สถานะ</th>
-              <th>ปิดงานเมื่อ</th>
-              <th>จัดการ</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in closedAppointments" :key="`closed-${item.id}`">
-              <td>
-                <span class="sku-code">{{ item.id }}</span
-                ><small class="table-subtext">{{ item.type }}</small>
-              </td>
-              <td>
-                <strong>{{ item.customer }}</strong
-                ><small class="table-subtext">{{ item.site }}</small>
-              </td>
-              <td>
-                <strong>{{ formatJobDate(item.date) }}</strong
-                ><small class="table-subtext">{{ item.time }}</small>
-              </td>
-              <td>{{ item.employees?.join(" · ") || item.crew }}</td>
-              <td>
-                <span :class="statusClass(item.status)">{{ item.status }}</span>
-              </td>
-              <td>
-                {{
-                  item.closedAt
-                    ? new Date(item.closedAt).toLocaleDateString("th-TH")
-                    : formatJobDate(item.date)
-                }}
-              </td>
-              <td>
-                <button
-                  class="button secondary table-button close-job-button"
-                  type="button"
-                  title="ยกเลิกการปิดงาน"
-                  @click="reopenAppointment(item)"
-                >
-                  <SvgIcon name="refresh" size="14" /><span
-                    >ยกเลิกการปิดงาน</span
-                  >
-                </button>
-              </td>
-            </tr>
-            <tr v-if="!closedAppointments.length">
-              <td colspan="7" class="empty-state">
-                ยังไม่มีงานติดตั้งที่ปิดแล้ว
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <TablePagination
-        :total="closedAppointments.length"
-        label="งานที่ปิดแล้ว"
       />
     </section>
     <section v-if="activeTab === 'service'" class="operations-service">
@@ -1637,16 +1546,14 @@ function createAppointment() {
             placeholder="ค้นหาเลขที่งาน ลูกค้า หรือพนักงาน..."
             label="ค้นหางานบริการหลังการขาย"
           />
-          <div class="table-filter-select control-field">
-            <span>สถานะ</span
-            ><select
+          <div class="table-filter-select control-field app-select-filter">
+            <span>สถานะ</span>
+            <AppSelect
               v-model="serviceStatusFilter"
+              :options="serviceStatusOptions"
+              search-placeholder="ค้นหาสถานะงานบริการ"
               aria-label="กรองสถานะงานบริการหลังการขาย"
-            >
-              <option v-for="status in serviceStatusOptions" :key="status">
-                {{ status }}
-              </option>
-            </select>
+            />
           </div>
         </div>
         <div class="table-scroll">
@@ -1694,23 +1601,14 @@ function createAppointment() {
                   </select>
                 </td>
                 <td>
-                  <div class="table-actions">
-                    <button
-                      class="button secondary table-button table-icon-button"
-                      title="แก้ไขรายละเอียดใบงาน"
-                      aria-label="แก้ไขรายละเอียดใบงาน"
-                      @click="openEditModal(ticket, 'service')"
-                    >
-                      <SvgIcon name="edit" size="15" /></button
-                    ><button
-                      class="button secondary table-button close-job-button"
-                      title="ปิดงาน"
-                      aria-label="ปิดงาน"
-                      @click="closeServiceTicket(ticket)"
-                    >
-                      <SvgIcon name="check" size="15" /><span>ปิดงาน</span>
-                    </button>
-                  </div>
+                  <button
+                    class="button secondary table-button table-icon-button"
+                    title="แก้ไขรายละเอียดใบงาน"
+                    aria-label="แก้ไขรายละเอียดใบงาน"
+                    @click="openEditModal(ticket, 'service')"
+                  >
+                    <SvgIcon name="edit" size="15" />
+                  </button>
                 </td>
               </tr>
               <tr v-if="!filteredServiceTickets.length">
@@ -1724,87 +1622,6 @@ function createAppointment() {
         <TablePagination
           :total="filteredServiceTickets.length"
           label="ใบงานบริการ"
-        />
-      </div>
-      <div class="operations-table-section completed-jobs-section">
-        <div class="task-table-heading">
-          <div>
-            <h2 class="section-heading">งานบริการที่ปิดแล้ว</h2>
-            <p class="section-caption">
-              ประวัติงานบริการหลังการขายที่ทีมดำเนินการเสร็จสิ้นแล้ว
-            </p>
-          </div>
-          <span class="completed-jobs-count"
-            >{{ closedServiceTickets.length }} งาน</span
-          >
-        </div>
-        <div class="table-scroll">
-          <table class="data-table operations-table">
-            <thead>
-              <tr>
-                <th>เลขที่ใบงาน</th>
-                <th>ลูกค้า / รายละเอียด</th>
-                <th>กำหนดเข้าบริการ</th>
-                <th>พนักงาน</th>
-                <th>สถานะ</th>
-                <th>ปิดงานเมื่อ</th>
-                <th>จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="ticket in closedServiceTickets"
-                :key="`closed-${ticket.id}`"
-              >
-                <td>
-                  <span class="sku-code">{{ ticket.id }}</span
-                  ><small class="table-subtext">เปิด {{ ticket.opened }}</small>
-                </td>
-                <td>
-                  <strong>{{ ticket.customer }}</strong
-                  ><small class="table-subtext">{{ ticket.subject }}</small>
-                </td>
-                <td>
-                  <strong>{{ formatJobDate(ticket.date) }}</strong
-                  ><small class="table-subtext">{{ ticket.time }}</small>
-                </td>
-                <td>{{ ticket.employees?.join(" · ") || ticket.owner }}</td>
-                <td>
-                  <span :class="statusClass(ticket.status)">{{
-                    ticket.status
-                  }}</span>
-                </td>
-                <td>
-                  {{
-                    ticket.closedAt
-                      ? new Date(ticket.closedAt).toLocaleDateString("th-TH")
-                      : formatJobDate(ticket.date)
-                  }}
-                </td>
-                <td>
-                  <button
-                    class="button secondary table-button close-job-button"
-                    type="button"
-                    title="ยกเลิกการปิดงาน"
-                    @click="reopenServiceTicket(ticket)"
-                  >
-                    <SvgIcon name="refresh" size="14" /><span
-                      >ยกเลิกการปิดงาน</span
-                    >
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="!closedServiceTickets.length">
-                <td colspan="7" class="empty-state">
-                  ยังไม่มีงานบริการที่ปิดแล้ว
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <TablePagination
-          :total="closedServiceTickets.length"
-          label="งานบริการที่ปิดแล้ว"
         />
       </div>
       <div

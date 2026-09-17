@@ -1,5 +1,12 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import SvgIcon from "@/components/SvgIcon.vue";
 
 const props = defineProps({
@@ -9,6 +16,8 @@ const props = defineProps({
 
 const page = ref(1);
 const pageSize = ref(10);
+const paginationRoot = ref(null);
+let tableObserver;
 const pageSizeValue = computed(() =>
   Math.min(1000, Math.max(1, Number(pageSize.value) || 1)),
 );
@@ -26,13 +35,58 @@ function commitPageSize() {
   pageSize.value = pageSizeValue.value;
   page.value = 1;
 }
-watch([() => props.total, pageSize], () => {
+function findTable() {
+  let parent = paginationRoot.value?.parentElement;
+  while (parent) {
+    const tables = [...parent.querySelectorAll("table")].filter((table) => {
+      const position = table.compareDocumentPosition(paginationRoot.value);
+      return position & Node.DOCUMENT_POSITION_FOLLOWING;
+    });
+    if (tables.length) return tables.at(-1);
+    parent = parent.parentElement;
+  }
+  return null;
+}
+function applyPagination() {
+  const table = findTable();
+  if (!table) return;
+  const rowGroups = [];
+  [...table.querySelectorAll(":scope > tbody > tr")].forEach((row) => {
+    const isDetailRow = row.className.includes("detail-row");
+    if (isDetailRow && rowGroups.length) rowGroups.at(-1).push(row);
+    else rowGroups.push([row]);
+  });
+  const firstVisible = (page.value - 1) * pageSizeValue.value;
+  rowGroups.forEach((group, index) => {
+    const hidden =
+      index < firstVisible || index >= firstVisible + pageSizeValue.value;
+    group.forEach((row) => {
+      row.hidden = hidden;
+    });
+  });
+}
+function refreshPagination() {
+  nextTick(applyPagination);
+}
+watch([() => props.total, pageSize, page], () => {
   page.value = Math.min(page.value, totalPages.value);
+  refreshPagination();
 });
+onMounted(() => {
+  refreshPagination();
+  tableObserver = new MutationObserver(refreshPagination);
+  const parent = paginationRoot.value?.parentElement;
+  if (parent) tableObserver.observe(parent, { childList: true, subtree: true });
+});
+onBeforeUnmount(() => tableObserver?.disconnect());
 </script>
 
 <template>
-  <nav class="table-pagination" :aria-label="`การแบ่งหน้า${label}`">
+  <nav
+    ref="paginationRoot"
+    class="table-pagination"
+    :aria-label="`การแบ่งหน้า${label}`"
+  >
     <p>แสดง {{ start }}–{{ end }} จาก {{ total }} {{ label }}</p>
     <div class="pagination-controls">
       <label class="page-size-control">
