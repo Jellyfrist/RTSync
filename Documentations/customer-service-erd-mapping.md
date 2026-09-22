@@ -1,14 +1,14 @@
 # ERD & Data Mapping: Customer / Sales / Installation / After-sales
 
-เอกสารนี้ออกแบบจาก workflow ที่แสดงใน UI ของ RT Sync Solar Workbench และครอบคลุม 5 ความสามารถหลัก:
+เอกสารนี้อ้างอิง workflow ที่แสดงใน UI ของ RT Sync Solar Workbench และสถานะข้อมูลที่ใช้งานจริงในปัจจุบัน:
 
 1. ขายสินค้าและออกใบเสนอราคา/คำสั่งขาย
 2. นัดหมายและติดตามงานติดตั้ง
-3. แจ้งเตือนสินค้าเมื่อ Stock ต่ำกว่าหรือเท่ากับ Reorder Point
+3. เติม Stock และสร้างรายการจัดซื้อเมื่อ Stock ต่ำกว่าหรือเท่ากับ Reorder Point
 4. บริการหลังการขายและประวัติการบริการ
 5. โปรไฟล์ลูกค้าแบบ master-detail ที่เชื่อมทุกกิจกรรมเข้าด้วยกัน
 
-สำหรับหน้า Supplier โดยเฉพาะ รองรับการเพิ่ม/แก้ไขข้อมูล Supplier และการผูก SKU ว่าสินค้าแต่ละรายการซื้อจาก Supplier รายใด
+สำหรับหน้า Supplier รองรับการเพิ่ม Supplier ผ่าน API, แก้ไขข้อมูลใน state ของหน้า, ผูก/ถอด SKU และติดตาม Purchase Order ใน mockDb
 
 ## ERD (logical model)
 
@@ -160,15 +160,15 @@ erDiagram
 
 | UI surface / feature | Primary entities | Fields used | Key behavior |
 | --- | --- | --- | --- |
-| `/customers` customer list | `CUSTOMER`, `CUSTOMER_SITE` | `customer_code`, `name`, `phone`, `customer_type`, `account_status`, `address` | Filter by customer type/status; select one customer to show detail |
-| `/suppliers` supplier directory | `SUPPLIER`, `PRODUCT` | `supplier_id`, `name`, `category`, `description`, `delivery_lead_time`, `sku_count`, `PRODUCT.supplier_id` | Add/edit Supplier; select Supplier to see all purchased SKUs; bind an existing product to the selected Supplier |
+| `/customers` customer list | `CUSTOMER` | `id`, `code`, `name`, `phone`, `email`, `customer_type`, `status`, `address` | Filter by type/status; search name/code/phone/email/contact; select customer to show detail |
+| `/suppliers` supplier directory | `SUPPLIER`, `PRODUCT`, `PURCHASE_ORDER` | `id`, `name`, `category`, `description`, `delivery`, `sku_count`, `supplierId`, `status` | Add Supplier via API; edit Supplier, bind/unbind SKU, and update purchase-order status in mockDb |
 | Customer detail / service history | `CUSTOMER`, `SERVICE_HISTORY`, `INSTALLATION_JOB`, `SERVICE_TICKET` | `system`, `service_type`, `detail`, `serviced_at`, `status` | Timeline combines installation and after-sales activities |
 | Sales tab | `SALES_ORDER`, `SALES_ORDER_ITEM`, `PRODUCT` | `order_no`, `customer_id`, `sku`, `quantity`, `unit_price`, `line_total`, `total_amount` | Add catalog items to draft quote; save order; preserve customer context |
-| Installation appointment tab | `INSTALLATION_JOB`, `CUSTOMER_SITE`, `EMPLOYEE`, `SALES_ORDER` | `scheduled_date`, `time_slot`, `crew`, `job_type`, `status` | Create appointment and move status: awaiting confirmation → confirmed → preparing equipment → installing → completed |
-| After-sales tab | `SERVICE_TICKET`, `SERVICE_HISTORY`, `EMPLOYEE`, `CUSTOMER` | `subject`, `priority`, `owner`, `status`, `opened_at`, `closed_at` | Open ticket, assign owner, track work, close ticket and append history |
+| Installation appointment tab | `INSTALLATION_JOB`, `EMPLOYEE`, `CUSTOMER` | `id`, `customer`, `site`, `date`, `time`, `employees`, `crew`, `type`, `status` | Create appointment; statuses: `รอยืนยัน` → `ยืนยันแล้ว` → `เตรียมอุปกรณ์` → `กำลังติดตั้ง` → `เสร็จสิ้น` |
+| After-sales tab | `SERVICE_TICKET`, `EMPLOYEE`, `CUSTOMER` | `id`, `customer`, `site`, `date`, `time`, `subject`, `priority`, `owner`, `employees`, `status` | Open/assign/edit service ticket; statuses include `รอเปิดงาน`, `รอมอบหมาย`, `นัดหมายแล้ว`, `ยืนยันแล้ว`, `กำลังเข้าบริการ`, `เสร็จสิ้น` |
 | Inventory product table | `PRODUCT`, `SUPPLIER`, `STOCK_MOVEMENT` | `sku`, `name`, `category`, `stock_qty`, `unit`, `unit_price`, `supplier_id` | Register/edit product; receive stock; maintain movement ledger |
 | Reorder Point tab | `PRODUCT`, `REORDER_ALERT`, `SUPPLIER` | `stock_qty`, `reorder_point`, `status`, `supplier_id` | Alert when `stock_qty <= reorder_point`; create purchasing request |
-| Header notification panel | `NOTIFICATION` plus source entity | `notification_type`, `title`, `status`, `created_at`, source FK | Show low stock, unconfirmed appointments, and new service tickets |
+| Fuel claims page | `FUEL_CLAIM`, `EMPLOYEE`, `INSTALLATION_JOB`, `SERVICE_TICKET` | `id`, `source`, `employee`, `job`, `vehicle`, `route`, `date`, `amount`, `receipt`, `status` | เปิด/แก้ไขรายการเบิกค่าน้ำมันและกรองสถานะ; ใช้ข้อมูลจาก mockDb |
 
 ## Existing API alignment
 
@@ -178,7 +178,7 @@ The current backend schemas are a starting point and map as follows:
 | --- | --- | --- |
 | `Customer` | `CUSTOMER` | Add `customer_code` uniqueness and `created_at` when persistence is introduced |
 | `Product` | `PRODUCT` | Add `reorder_point`, `unit`, `supplier_id`, and `status` to support the inventory UI and supplier binding |
-| `Supplier` | `SUPPLIER` | Existing `delivery` maps to `delivery_lead_time`; add `description`, contact fields, and a product relation later |
+| `Supplier` | `SUPPLIER` | Existing `delivery` is the UI label; contact/payment fields and product relation are not fully persisted in backend |
 | `Employee` | `EMPLOYEE` | Existing payroll fields remain in employee/payroll domain; installation/service uses the same employee key |
 | `CatalogSummary` | Read model / dashboard projection | Should be computed from `PRODUCT` and `STOCK_MOVEMENT`, not hard-coded |
 
@@ -190,7 +190,7 @@ The current backend schemas are a starting point and map as follows:
 - Create or keep one active `REORDER_ALERT` per product while `stock_qty <= reorder_point`; resolve it after stock rises above the point.
 - An `INSTALLATION_JOB` should reference a `CUSTOMER_SITE`, even when a customer has only one site today.
 - Closing a `SERVICE_TICKET` should write one `SERVICE_HISTORY` record and store `closed_at`.
-- Notifications should be generated from domain events and marked read independently from the source record.
+- Header notification panel/notification entity is not currently implemented in the shown views; add it only when a notification UI/API is introduced.
 
 ## Suggested implementation sequence
 

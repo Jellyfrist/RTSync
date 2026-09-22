@@ -1,11 +1,13 @@
 # ERD & Mapping: Product Inventory Management
 
-เอกสารนี้จัดทำให้สอดคล้องกับ UI **จัดการข้อมูลสินค้า** และ ERD ที่แนบมา โดยใช้โครงสร้างหลัก 4 ส่วน:
+เอกสารนี้จัดทำให้สอดคล้องกับ UI **จัดการข้อมูลสินค้า** ที่ใช้อยู่ในปัจจุบัน โดยใช้โครงสร้างหลัก 4 ส่วน:
 
 - `PRODUCTS` — master data ของสินค้าและยอดคงคลังปัจจุบัน
 - `STOCK_MOVEMENTS` — ประวัติการรับเข้า/เบิกออกตามช่วงเวลา
 - `REORDER_ALERTS` — รายการแจ้งเตือนเมื่อสินค้าอยู่ที่หรือต่ำกว่า Reorder Point
-- `INVENTORY_SUMMARY` — report view สำหรับ KPI และภาพรวมคลังสินค้า ไม่ใช่ตาราง transaction หลัก
+- `INVENTORY_SUMMARY` — API summary สำหรับ KPI (มี fallback ฝั่ง frontend)
+
+> UI ปัจจุบันมี master data สินค้า, เติม Stock, Reorder Point, สร้างใบสั่งซื้อจากรายการต่ำกว่าจุดสั่งซื้อ และตรวจราคาขายเทียบต้นทุน ส่วนรายงาน stock movement เป็นโครงสร้าง backend ที่รองรับ แต่ยังไม่ใช่ workflow หลักบนหน้า UI
 
 ## ERD (relational view)
 
@@ -21,7 +23,8 @@ erDiagram
       string category
       string supplier
       string unit
-      decimal unit_price
+      decimal cost_price
+      decimal sale_price
       int initial_stock
       string stock_status
       decimal total_value
@@ -69,20 +72,20 @@ erDiagram
 | ทะเบียนสินค้า | SKU / รหัสสินค้า | `PRODUCTS.sku` | Primary key และรหัสสินค้าไม่ซ้ำ |
 | ทะเบียนสินค้า | ชื่อสินค้า | `PRODUCTS.product_name` | ชื่อที่ใช้ค้นหาและแสดงในตาราง |
 | ทะเบียนสินค้า | หมวดหมู่ | `PRODUCTS.category` | เช่น แผงโซลาร์, อินเวอร์เตอร์, อุปกรณ์วัด |
-| ทะเบียนสินค้า | ซัพพลายเออร์ | `PRODUCTS.supplier` | ตามภาพแนบเก็บเป็น attribute ของ Product โดยตรง |
+| ทะเบียนสินค้า | ซัพพลายเออร์ | `PRODUCTS.supplier` | เลือกจากรายชื่อ Supplier ที่โหลดจาก API |
 | ทะเบียนสินค้า | หน่วยนับ | `PRODUCTS.unit` | เช่น แผง, เครื่อง, ชิ้น, ม้วน |
-| ทะเบียนสินค้า | ราคาต่อหน่วย | `PRODUCTS.unit_price` | ใช้คำนวณมูลค่าคงคลัง |
+| ทะเบียนสินค้า | ราคาทุน / ราคาขาย | `PRODUCTS.cost_price`, `PRODUCTS.sale_price` | ราคาขายใช้ในใบเสนอราคา ราคาทุนใช้คำนวณมูลค่าและตรวจ margin |
 | modal ลงทะเบียนสินค้า | จำนวน Stock เริ่มต้น | `PRODUCTS.initial_stock` | ค่าเริ่มต้นก่อนมี movement |
 | ตารางสินค้า | คงเหลือ | `PRODUCTS.current_stock` | ยอด Stock ปัจจุบัน |
 | ตารางสินค้า | Reorder Point | `PRODUCTS.reorder_point` | จุดสั่งซื้อขั้นต่ำ |
-| ตารางสินค้า | มูลค่า | `PRODUCTS.total_value` | มูลค่าคงคลังของ SKU นั้น |
-| ตารางสินค้า | สถานะ | `PRODUCTS.stock_status` | พร้อมจำหน่าย / ต้องสั่งเพิ่ม |
+| ตารางสินค้า | มูลค่า | `current_stock × weighted_average_cost` | คำนวณฝั่ง UI จาก cost lots ไม่ใช่ค่าที่ผู้ใช้กรอกโดยตรง |
+| ตารางสินค้า | สถานะ | `PRODUCTS.stock_status` | พร้อมขาย / ต้องสั่งเพิ่ม |
 | รายงาน Stock | รับเข้า | `STOCK_MOVEMENTS.received_quantity` | จำนวนรับเข้าตาม `movement_period` |
 | รายงาน Stock | เบิกออก | `STOCK_MOVEMENTS.issued_quantity` | จำนวนจ่าย/เบิกออกตาม `movement_period` |
 | รายงาน Stock | Movement เดือนนี้ | `STOCK_MOVEMENTS.net_movement` | ผลต่างรับเข้าและเบิกออก |
 | รายงาน Stock | Stock รายสัปดาห์ | `STOCK_MOVEMENTS.weekly_stock_quantity` | ยอดที่ใช้แสดงแนวโน้มรายสัปดาห์ |
 | Reorder Point | รายการต้องสั่งเพิ่ม | `REORDER_ALERTS.sku` | FK ไปยัง Product ที่เข้าเงื่อนไข |
-| Reorder Point | สถานะใบสั่งซื้อ | `REORDER_ALERTS.purchase_order_status` | เช่น ยังไม่สร้าง, สร้างแล้ว, รับเข้าแล้ว |
+| Reorder Point | สถานะใบสั่งซื้อ | `PURCHASE_ORDERS.status` | `รอดำเนินการ`, `กำลังจัดซื้อ`, `สั่งซื้อแล้ว`, `รอของมาส่ง`, `รับของเรียบร้อยแล้ว`, `สำเร็จ` |
 | Reorder Point | สถานะ Reorder | `REORDER_ALERTS.reorder_status` | ปกติ / ต้องสั่งเพิ่ม |
 | KPI สินค้าทั้งหมด | สินค้าทั้งหมด | `INVENTORY_SUMMARY.total_products` | จำนวน SKU ทั้งหมด |
 | KPI มี Stock | สินค้ามี Stock | `INVENTORY_SUMMARY.products_with_stock` | จำนวน SKU ที่ `current_stock > 0` |
@@ -103,14 +106,13 @@ net_movement = received_quantity - issued_quantity
     stock_status = "ต้องสั่งเพิ่ม"
     reorder_status = "ต้องสั่งเพิ่ม"
 ถ้า current_stock > reorder_point:
-    stock_status = "พร้อมจำหน่าย"
-    reorder_status = "ปกติ"
+    stock_status = "พร้อมขาย"
 ```
 
 กติกาเพิ่มเติม:
 
 - `current_stock`, `total_value`, `net_movement` และ `stock_status` เป็นค่าคำนวณ ไม่ควรแก้โดยตรงจาก report view
-- ทุกการเติม Stock จาก action “เติมสินค้า” ควรสร้าง `STOCK_MOVEMENTS` รายการ `received_quantity`
+- ทุกการเติม Stock จาก action “เติมสินค้า” เรียก `POST /inventory/products/{sku}/receive` และฝั่ง mock จะเพิ่ม cost lot ด้วย
 - ทุกการขาย/เบิกสินค้า ควรสร้าง `STOCK_MOVEMENTS` รายการ `issued_quantity`
 - การสร้าง alert ควรป้องกัน active alert ซ้ำสำหรับ SKU เดียวกันในรอบเดียวกัน
 - เมื่อรับสินค้าเข้าและ `current_stock > reorder_point` ให้เปลี่ยน `reorder_status` เป็น `ปกติ` หรือปิด alert เดิม
@@ -120,8 +122,7 @@ net_movement = received_quantity - issued_quantity
 | UI section | Source | Output |
 | --- | --- | --- |
 | ทะเบียนสินค้า | `PRODUCTS` | ตาราง SKU, สินค้า, หมวดหมู่, Stock, Reorder Point, มูลค่า, สถานะ |
-| รายงาน Stock | `PRODUCTS` + `STOCK_MOVEMENTS` | Stock แยกหมวดหมู่, movement เดือนนี้, trend รายสัปดาห์ |
-| Reorder Point | `PRODUCTS` + `REORDER_ALERTS` | การ์ดสินค้าที่ต่ำกว่าหรือเท่ากับจุดสั่งซื้อ และ action สร้างรายการสั่งซื้อ |
+| Reorder Point | `PRODUCTS` + `PURCHASE_ORDERS` | รายการสินค้าที่ต่ำกว่าหรือเท่ากับจุดสั่งซื้อ และ action สร้าง/ติดตามใบสั่งซื้อ |
 | KPI cards | `INVENTORY_SUMMARY` | สินค้าทั้งหมด, มูลค่าคงคลัง, จำนวนรายการ Reorder |
 | ค้นหา/กรอง | `PRODUCTS.sku`, `product_name`, `category` | กรองในทะเบียนสินค้าโดยไม่เปลี่ยนความสัมพันธ์ของข้อมูล |
 
@@ -142,11 +143,12 @@ net_movement = received_quantity - issued_quantity
 
 ## Consistency note with current frontend
 
-UI ปัจจุบันใช้ชื่อ property แบบ camelCase (`stock`, `reorderPoint`, `price`, `supplier`) ขณะที่ ERD ใช้ชื่อ database ตามภาพแนบ (`current_stock`, `reorder_point`, `unit_price`, `supplier`) ดังนั้น API mapper ควรแปลงชื่อระหว่างสองชั้น เช่น:
+UI ปัจจุบันใช้ชื่อ property แบบ camelCase (`stock`, `reorderPoint`, `price`, `salePrice`, `supplier`) ขณะที่ backend ใช้ชื่อ `current_stock`, `reorder_point`, `unit_price`, `supplier` ดังนั้น API mapper แปลงชื่อระหว่างสองชั้น เช่น:
 
 ```text
 product.stock        ↔ PRODUCTS.current_stock
 product.reorderPoint ↔ PRODUCTS.reorder_point
-product.price        ↔ PRODUCTS.unit_price
+product.price        ↔ PRODUCTS.unit_price (ราคาทุนเมื่อมาจาก inventory API)
+product.salePrice    ↔ ราคาขายที่เก็บใน mock/catalog
 product.supplier     ↔ PRODUCTS.supplier
 ```

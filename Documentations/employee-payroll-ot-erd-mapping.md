@@ -1,12 +1,12 @@
 # ERD & Data Mapping: Employee / Payroll / Overtime
 
-เอกสารนี้ออกแบบจากหน้า **ค่าตอบแทนและ OT พนักงาน** และ workflow ที่ UI รองรับ:
+เอกสารนี้อ้างอิงจากหน้า **ข้อมูลพนักงานและเงินเดือน** ใน UI ปัจจุบัน โดยระบุสิ่งที่หน้าใช้งานจริงก่อน แล้วจึงคง ERD สำหรับการขยายระบบไว้:
 
 - เพิ่มและแก้ไขข้อมูลพนักงาน
 - จัดเก็บเงินเดือนพื้นฐาน
-- บันทึกชั่วโมง OT และอัตรา OT ต่อชั่วโมง
-- บันทึกค่าเบี้ยเลี้ยง/ค่าจ้างเพิ่มเติมและรายการหัก
-- คำนวณค่าแรง ค่าล่วงเวลา ค่าจ้างรวม และค่าจ้างสุทธิรายเดือน
+- บันทึกเงินเดือนพื้นฐาน ค่าเบี้ยเลี้ยง และรายการหัก
+- คำนวณค่าจ้างรวมและค่าจ้างสุทธิจากข้อมูลพนักงาน
+- ข้อมูล OT มีอยู่ใน mock data/API normalization แต่ยังไม่มีช่องกรอกหรือรายการ OT ใน UI ปัจจุบัน
 
 ## ERD (logical model)
 
@@ -90,40 +90,36 @@ erDiagram
 
 | UI surface / feature | Primary entities | Fields mapped | Behavior |
 | --- | --- | --- | --- |
-| รายชื่อพนักงาน | `EMPLOYEE` | `employee_id`, `name`, `role`, `employment_status` | ค้นหาและเลือกพนักงานเพื่อเปิดรายละเอียด Payroll |
-| เพิ่มพนักงาน | `EMPLOYEE`, `EMPLOYEE_ALLOWANCE`, `EMPLOYEE_DEDUCTION` | `name`, `role`, `salary`, `allowance`, `deduction` | Modal validate ชื่อ/ตำแหน่ง แล้วสร้าง employee record ใหม่ |
+| รายชื่อพนักงาน | `EMPLOYEE` | `id`, `name`, `role`, `phone`, `startDate`, `salary` | ค้นหาด้วยชื่อ/รหัส/ตำแหน่ง และเปิดรายละเอียดค่าตอบแทน |
+| เพิ่มพนักงาน | `EMPLOYEE` | `name`, `role`, `phone`, `email`, `startDate`, `salary`, `allowance`, `deduction` | Modal บังคับชื่อและตำแหน่ง สร้างรหัสรูปแบบ `EMP-TH-###` |
 | แก้ไขข้อมูลพนักงาน | `EMPLOYEE`, compensation inputs | ข้อมูลพนักงานและค่าตอบแทนที่แก้ไขได้ | โหลดข้อมูลของพนักงานที่เลือกเข้า form และบันทึกกลับ record เดิม |
-| ข้อมูลเงินเดือนพื้นฐาน | `EMPLOYEE`, `PAYROLL` | `base_salary`, `payroll_period` | แสดงฐานเงินเดือนของรอบปัจจุบัน |
-| ข้อมูล OT | `OVERTIME_ENTRY`, `PAYROLL_ITEM` | `hours`, `hourly_rate`, `amount`, `approval_status` | คำนวณ `OT amount = hours × hourly_rate` และแสดงสถานะรอตรวจสอบ |
-| ค่าเบี้ยเลี้ยง/ค่าจ้างเพิ่ม | `EMPLOYEE_ALLOWANCE`, `PAYROLL_ITEM` | `allowance_type`, `amount` | รวมเข้า gross pay ของรอบเดือน |
-| รายการหัก | `EMPLOYEE_DEDUCTION`, `PAYROLL_ITEM` | `deduction_type`, `amount` | หักจาก gross pay ก่อนคำนวณ net pay |
-| ปุ่ม “คำนวณค่าจ้าง” | `PAYROLL` | `base_salary`, `overtime_total`, `allowance_total`, `deduction_total`, `gross_amount`, `net_amount` | สรุปยอดก่อนหักและค่าจ้างสุทธิ พร้อม feedback ให้ผู้ใช้ |
-| KPI หน้า Payroll | `EMPLOYEE`, `OVERTIME_ENTRY`, `PAYROLL` | count employee, sum OT hours, sum OT amount, sum net amount | ควรเป็น aggregate query ตาม payroll period ไม่ใช่ค่าคงที่ |
+| ข้อมูลเงินเดือนพื้นฐาน | `EMPLOYEE` | `salary` | แสดงฐานเงินเดือนจาก employee record ปัจจุบัน; ยังไม่มี payroll period |
+| ข้อมูล OT | ยังไม่มี entity ที่ UI แก้ไขได้ | `otHours`, `otRate` (อ่านได้จากข้อมูลที่ normalize) | ยังไม่แสดงในตาราง/สูตร Payroll ปัจจุบัน |
+| ค่าเบี้ยเลี้ยง/ค่าจ้างเพิ่ม | `EMPLOYEE` | `allowance` | รวมเข้า gross pay ของพนักงานที่เลือก |
+| รายการหัก | `EMPLOYEE` | `deduction` | หักจาก gross pay ก่อนคำนวณ net pay |
+| ปุ่ม “คำนวณเงินเดือน” | `EMPLOYEE` | `salary`, `allowance`, `deduction`, `gross`, `net` | คำนวณฝั่ง client และแสดง notification |
+| KPI หน้า Payroll | `EMPLOYEE` | count employee, sum `salary + allowance - deduction` | แสดงพนักงานทั้งหมด, พร้อมมอบหมายงาน และค่าจ้างรวมสุทธิ |
 
-## Calculation rules
+## Calculation rules ที่ UI ใช้จริง
 
 ```text
-overtime_amount = overtime_hours × overtime_hourly_rate
-gross_amount = base_salary + overtime_total + allowance_total
-net_amount = gross_amount - deduction_total
+gross_amount = salary + allowance
+net_amount = gross_amount - deduction
 ```
 
 ข้อควรระวัง:
 
-- ควร snapshot อัตรา OT และเงินเดือนลงใน `PAYROLL_ITEM` ทุกครั้งที่คำนวณ เพื่อไม่ให้ข้อมูลย้อนหลังเปลี่ยนตาม master data
-- OT ที่ยังไม่ผ่านการอนุมัติควรแสดงสถานะ `PENDING_APPROVAL` และไม่รวมในยอดจ่ายจริงจนกว่าจะอนุมัติ
-- หากมีหลายประเภทค่าแรง เช่น รายวัน/รายชั่วโมง ให้เพิ่ม `pay_rate_type` และ `regular_hours` ใน Payroll calculation
-- Payroll ที่สถานะ `PAID` ไม่ควรแก้ไขโดยตรง ให้ใช้ adjustment/reversal record แทน
+- ปุ่ม “คำนวณเงินเดือน” ใน UI เป็นการคำนวณฝั่ง client และแสดง notification เท่านั้น ยังไม่มีการสร้าง Payroll record หรือรอบจ่ายจริง
+- `totalNetPayroll` รวม `salary + allowance - deduction` ของพนักงานทั้งหมดที่โหลดมา
+- ถ้าจะเปิดใช้ OT ต้องเพิ่มช่องกรอก รายการอนุมัติ และนำ OT ที่อนุมัติแล้วเข้า `gross_amount` ก่อนใช้งานจริง
 
 ## State transition
 
 ```text
-Employee active
-    -> Payroll draft
-    -> Calculated
-    -> Pending approval
-    -> Approved
-    -> Paid
+Employee record
+    -> Edit compensation inputs
+    -> Client-side calculation
+    -> Notification only
 ```
 
 ## Backend alignment
@@ -131,7 +127,7 @@ Employee active
 | Schema ปัจจุบัน | ERD entity | สิ่งที่ควรเพิ่ม |
 | --- | --- | --- |
 | `Employee.id` | `EMPLOYEE.employee_id` | `employee_code`, `phone`, `start_date`, `employment_status`, timestamps |
-| `Employee.salary` | `PAYROLL.base_salary` | ย้ายค่าจ้างตามรอบไป Payroll และเก็บประวัติการเปลี่ยนแปลง |
-| `Employee.overtime_hours` | `OVERTIME_ENTRY.hours` | เพิ่มวันที่ทำ OT, rate, amount, approval status และ reference |
+| `Employee.salary` | `PAYROLL.base_salary` (อนาคต) | ปัจจุบันยังเก็บและแก้ไขอยู่ใน employee record |
+| `Employee.overtime_hours` | `OVERTIME_ENTRY.hours` (อนาคต) | มีใน mock data เป็น `overtime_hours` และถูก normalize เป็น `otHours` แต่ UI ยังไม่ใช้คำนวณ |
 
-ปัจจุบัน repository เป็น mock data และ UI คำนวณฝั่ง client เพื่อให้ทดสอบ workflow ได้ เมื่อเชื่อมฐานข้อมูลจริงควรใช้ API transaction สำหรับการบันทึก Employee, บันทึก OT, คำนวณ Payroll และอนุมัติการจ่าย พร้อม index ที่ `employee_id`, `payroll_period`, `approval_status` และ `status`.
+ปัจจุบัน `GET /employees` โหลดข้อมูลพนักงานจาก backend ได้ และ fallback เป็น `mockDb` เมื่อเรียก API ไม่สำเร็จ ส่วนการเพิ่ม/แก้ไขพนักงานและการคำนวณค่าจ้างยังบันทึกใน `mockDb`/localStorage ฝั่ง frontend ไม่มี endpoint สำหรับ Payroll หรือ OT โดยเฉพาะ

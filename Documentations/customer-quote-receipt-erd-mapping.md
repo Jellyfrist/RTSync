@@ -1,11 +1,11 @@
 # ERD & Data Mapping: Customer / Quotation / Receipt
 
-เอกสารนี้ออกแบบจากหน้า **ระบบจัดการข้อมูลลูกค้าและประวัติการบริการ** และ workflow ที่ UI รองรับ:
+เอกสารนี้อ้างอิงจากหน้า **ระบบจัดการข้อมูลลูกค้าและประวัติการบริการ** และ workflow ที่ UI รองรับในปัจจุบัน:
 
 - เพิ่มและแก้ไขข้อมูลลูกค้า
 - เลือกลูกค้าเพื่อดูข้อมูลแบบ master-detail
 - สร้างใบเสนอราคาจากรายการสินค้า
-- ออกใบเสร็จจากยอดที่รับชำระ
+- ออกใบเสร็จจากยอดใบเสนอราคา (สถานะอยู่ใน state ของหน้า)
 - เก็บประวัติการบริการไว้กับลูกค้า
 
 ## ERD (logical model)
@@ -27,7 +27,7 @@ erDiagram
       string name
       string phone
       string customer_type
-      string account_status
+      string status
       datetime created_at
       datetime updated_at
     }
@@ -35,8 +35,7 @@ erDiagram
       string site_id PK
       string customer_id FK
       string address
-      string installation_system
-      string site_status
+      string system
     }
     PRODUCT {
       string product_id PK
@@ -99,43 +98,43 @@ erDiagram
 
 | UI surface / feature | Primary entity | Fields mapped | Behavior |
 | --- | --- | --- | --- |
-| รายการลูกค้าด้านซ้าย | `CUSTOMER` | `customer_code`, `name`, `phone`, `location`, `customer_type`, `account_status` | ค้นหา/กรองตามประเภทและสถานะ แล้วเลือก customer เพื่อเปิดรายละเอียด |
-| เพิ่มลูกค้าใหม่ | `CUSTOMER`, `CUSTOMER_SITE` | `name`, `phone`, `customer_type`, `location`, `installation_system` | Modal validate ชื่อ/เบอร์โทร แล้วสร้าง `customer_code` ใหม่ |
-| แก้ไขข้อมูลลูกค้า | `CUSTOMER`, `CUSTOMER_SITE` | ฟิลด์ข้อมูลลูกค้าที่แก้ไขได้ | โหลดข้อมูลของลูกค้าที่เลือกเข้าฟอร์มแล้วบันทึกกลับ record เดิม |
-| แท็บข้อมูลลูกค้า | `CUSTOMER`, `CUSTOMER_SITE`, `SERVICE_HISTORY` | `account_status`, `installation_system`, `serviced_at`, `service_type`, `detail`, `status` | แสดงข้อมูลระบบติดตั้งและประวัติบริการล่าสุด |
-| แท็บใบเสนอราคา | `QUOTATION`, `QUOTATION_ITEM`, `PRODUCT` | `quotation_no`, `customer_id`, `sku`, `quantity`, `unit_price`, `line_total`, `total_amount` | เลือกสินค้า เพิ่มจำนวน คำนวณยอดรวม และบันทึกใบเสนอราคา |
-| ปุ่ม “ทำใบเสนอราคา” | `CUSTOMER` → `QUOTATION` | `customer_id`, `site_id` | เปิด workspace ใบเสนอราคาโดยคง context ของลูกค้าที่เลือก |
-| แท็บใบเสร็จ | `RECEIPT`, `PAYMENT`, `QUOTATION`, `CUSTOMER` | `receipt_no`, `quotation_id`, `amount`, `status`, `issued_at`, `method` | แสดงยอดที่รับชำระ และออกเลขที่ใบเสร็จเมื่อกดยืนยัน |
+| รายการลูกค้าด้านซ้าย | `CUSTOMER` | `id`, `code`, `name`, `phone`, `email`, `location`, `customer_type`, `status` | ค้นหาด้วยชื่อ/รหัส/เบอร์/อีเมล/ผู้ติดต่อ และกรองประเภท/สถานะ |
+| เพิ่มลูกค้าใหม่ | `CUSTOMER` | `name`, `phone`, `contactName`, `email`, `taxId`, `type`, `address` | บังคับชื่อและเบอร์โทร; ลูกค้าธุรกิจต้องมีชื่อผู้ติดต่อ; สร้าง code รูปแบบ `CUST-2025-###` |
+| แก้ไขข้อมูลลูกค้า | `CUSTOMER` | ฟิลด์เดียวกับฟอร์มเพิ่มลูกค้า | โหลดลูกค้าที่เลือกเข้า modal แล้วแก้ไข record เดิม |
+| แท็บข้อมูลลูกค้า | `CUSTOMER`, งานขาย/ติดตั้ง/บริการ | `system`, `salesHistory`, `installationHistory`, `serviceHistory` | แสดงระบบติดตั้งและประวัติตาม customer code/ชื่อ |
+| แท็บใบเสนอราคา | `QUOTATION`, `QUOTATION_ITEM`, `PRODUCT` | `sku`, `name`, `qty`, `price`, `line_total`, `total` | เลือกสินค้าจาก inventory API เพิ่มจำนวน และรวมยอดจาก `price × qty` |
+| ปุ่ม “ทำใบเสนอราคา” | `CUSTOMER` → local quotation state | `customerCode`, `items`, `total` | ต้องมีสินค้าอย่างน้อย 1 รายการ แล้วเปลี่ยนไปยัง workspace ใบเสนอราคา; หน้า Customer ยังไม่ persist quotation ลง backend |
+| แท็บใบเสร็จ | local receipt state | `receiptIssued`, `quoteTotal` | ออกได้เมื่อยอดใบเสนอราคาไม่เป็นศูนย์; ยังไม่มี Payment/Receipt endpoint จริง |
 
 ## State transition
 
 ```text
 Customer active
     -> Quotation draft
-    -> Quotation saved / accepted
-    -> Payment recorded
-    -> Receipt issued
+    -> Quotation saved
+    -> Receipt flag set in UI
 ```
 
-สถานะที่แนะนำ:
+สถานะที่มีใน UI/ข้อมูลปัจจุบัน:
 
 - `QUOTATION`: `DRAFT`, `SENT`, `ACCEPTED`, `EXPIRED`, `CANCELLED`
-- `RECEIPT`: `PENDING`, `ISSUED`, `VOID`
-- `PAYMENT`: `PENDING`, `PAID`, `REFUNDED`
+- ลูกค้า: `ชำระครบถ้วน`, `ชำระมัดจำ`, `รอนัดตรวจเช็ก`, `รอเปิดบัญชี`
+- ใบเสนอราคา: `ร่างใบเสนอราคา`
+- ใบเสร็จ: ใช้ boolean `receiptIssued` ในหน้า ยังไม่มี status enum หรือเลขใบเสร็จจริง
 
 ## Backend alignment
 
 | Schema ปัจจุบัน | ERD entity | สิ่งที่ควรเพิ่ม |
 | --- | --- | --- |
-| `Customer` | `CUSTOMER` | เปลี่ยน `id` เป็น `customer_id`, เพิ่ม `customer_code` unique, `customer_type`, timestamps และแยก `location` ไป `CUSTOMER_SITE` เมื่อมีหลายไซต์ |
-| `Product` | `PRODUCT` | ใช้ `sku`, `name`, `price` เป็นฐาน และเพิ่ม `product_id`, `unit`, `supplier_id`, `reorder_point`, `status` |
+| `Customer` | `CUSTOMER` | backend ส่งข้อมูลลูกค้าปัจจุบัน; frontend normalize `customer_type` เป็น `type` และใช้ `address`/`location` |
+| `Product` | `PRODUCT` | ใช้ `sku`, `name`, `price`, `unit` จาก inventory API สำหรับรายการใบเสนอราคา |
 | `CatalogSummary` | Dashboard read model | คำนวณจาก `PRODUCT`/Stock ledger แทนค่าคงที่ |
 
 ## Data rules
 
-- `customer_code`, `quotation_no`, และ `receipt_no` ต้องไม่ซ้ำกัน
+- `customer.code` และเลขเอกสาร quotation/receipt (เมื่อเพิ่ม persistence) ต้องไม่ซ้ำกัน
 - `QUOTATION_ITEM.line_total = quantity * unit_price`; ราคาที่ quote ต้อง snapshot ไว้ ไม่อิงราคาสินค้าปัจจุบันย้อนหลัง
 - `QUOTATION.total_amount` ควรคำนวณจากรายการสินค้า หักส่วนลด และบวกภาษีตาม policy ของระบบ
-- ออก `RECEIPT` ได้เมื่อมี `PAYMENT` สถานะ `PAID` และยอดชำระผ่าน validation แล้ว
+- ปัจจุบันออกใบเสร็จใน UI ได้เมื่อ `quoteTotal > 0`; หากทำ persistence จริงควรเพิ่ม Payment/Receipt transaction และเลขเอกสาร
 - การแก้ไขลูกค้าต้องไม่แก้ประวัติ quotation/receipt ที่ออกไปแล้ว
 - เมื่อเชื่อมฐานข้อมูลจริง การเพิ่ม/แก้ไขลูกค้า, save quotation และ issue receipt ควรเป็น API transaction พร้อม audit log
