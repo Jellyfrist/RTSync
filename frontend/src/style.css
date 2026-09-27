@@ -17,10 +17,10 @@ STYLE.CSS SECTION INDEX
 12. Responsive                  Lines 197-200
 
 Developer Guide:
-แก้ปุ่ม → Section 6
-แก้ Input / Form → Section 7
-แก้ Table / Card → Section 8-9
-แก้ Sidebar / Header → Section 4-5
+Edit buttons → Section 6
+Edit inputs and forms → Section 7
+Edit tables and cards → Sections 8-9
+Edit sidebar and header → Sections 4-5
 ================================================== */
 
 /* ==================================================
@@ -198,3 +198,21 @@ input::placeholder { color:#94a3b8; }
    ================================================== */
 @media (max-width:1000px) { .app-sidebar { width:220px; } .app-content { margin-left:220px; } .app-header { left:220px; } .kpi-grid.four { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:760px) { .app-sidebar { position:static; width:100%; height:auto; } .app-sidebar .sidebar-scroll { display:none; } .app-shell { display:block; } .app-content { margin-left:0; } .app-header { left:0; position:sticky; height:auto; min-height:62px; padding:10px 14px; gap:10px; } .header-search { width:100%; } .header-actions .online-status { display:none; } .page-content { padding:20px 14px 30px; } .page-title, .detail-heading { flex-direction:column; } .master-detail, .payroll-workbench { grid-template-columns:1fr; } .kpi-grid, .kpi-grid.four, .info-grid { grid-template-columns:1fr; } .button-row { width:100%; } }
+
+/* Procurement workflow */
+.workflow-section { margin-bottom:18px; }
+.workflow-section h2 { margin-bottom:10px; }
+.workflow-section > .button { margin-top:14px; }
+.workflow-form { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin:12px 0; }
+.workflow-form label { flex:1 1 170px; margin:0; }
+.workflow-form > span { flex:1 1 170px; }
+.workflow-form .button { flex:none; }
+.workflow-section select { min-height:36px; width:100%; padding:7px 10px; border:1px solid var(--border); border-radius:7px; background:white; font:inherit; }
+.workflow-alert { padding:10px 12px; margin-bottom:14px; border-radius:7px; }
+.workflow-alert.error { color:#991b1b; background:#fef2f2; border:1px solid #fecaca; }
+.workflow-alert.success-message { color:#065f46; background:#ecfdf5; border:1px solid #a7f3d0; }
+.workflow-receipt { padding:14px; margin-top:20px; background:#f8fafc; border-radius:8px; }
+.workflow-receipt > .button { margin-top:12px; }
+.workflow-history { padding:9px 0; border-bottom:1px solid var(--border); }
+.workflow-history small { display:block; }
+.button:disabled { opacity:.55; cursor:not-allowed; }

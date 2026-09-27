@@ -3,5 +3,5 @@ import App from './App.vue'
 import router from './router'
 import './style.css'
 
-// เริ่มต้น Vue application พร้อม router และ global stylesheet
+// Start the Vue application with the router and global stylesheet.
 createApp(App).use(router).mount('#app')

@@ -1,74 +1,9 @@
 <script setup>
-import { ref, computed } from "vue";
 import AppShell from "@/components/AppShell.vue";
 import SvgIcon from "@/components/SvgIcon.vue";
-import { useModal } from "@/composables/useModal";
+import { useCustomerController } from "@/controllers/useCustomerController.js";
 
-const customers = ref([
-  {
-    id: "089",
-    code: "CUST-2024-089",
-    name: "คุณสมศักดิ์ วัฒนากุล",
-    phone: "081-924-XXXX",
-    location: "อ.บางพลี จ.สมุทรปราการ",
-    type: "บ้านพักอาศัย",
-    status: "ชำระครบถ้วน",
-    system: "10 kWp On-Grid (Huawei + Jinko)",
-  },
-  {
-    id: "088",
-    code: "CUST-2024-088",
-    name: "บจก. ธนทรัพย์ โลจิสติกส์",
-    phone: "089-455-XXXX",
-    location: "นิคมฯ ลาดกระบัง กทม.",
-    type: "ธุรกิจ/โรงงาน",
-    status: "รอตรวจรับงวด 2",
-    system: "120 kWp Zero-Export (Solis + Longi)",
-  },
-  {
-    id: "087",
-    code: "CUST-2024-087",
-    name: "คุณกมลชนก สุขใจ",
-    phone: "086-321-XXXX",
-    location: "อ.เมือง จ.นนทบุรี",
-    type: "บ้านพักอาศัย",
-    status: "ชำระครบถ้วน",
-    system: "5 kWp On-Grid (Huawei + Longi)",
-  },
-  {
-    id: "086",
-    code: "CUST-2024-086",
-    name: "บริษัท พลังงานไทย จำกัด",
-    phone: "082-888-XXXX",
-    location: "อ.บางปะอิน จ.อยุธยา",
-    type: "ธุรกิจ/โรงงาน",
-    status: "รอนัดตรวจเช็ก",
-    system: "80 kWp On-Grid (SMA + Jinko)",
-  },
-]);
-const activeId = ref("089");
-const selectedType = ref("ทั้งหมด");
-const { isOpen, open, close } = useModal();
-const selectedCustomer = computed(() =>
-  customers.value.find((customer) => customer.id === activeId.value),
-);
-const visibleCustomers = computed(() =>
-  selectedType.value === "ทั้งหมด"
-    ? customers.value
-    : customers.value.filter(
-        (customer) =>
-          customer.type === selectedType.value ||
-          (selectedType.value === "รอนัดตรวจเช็ก" &&
-            customer.status === selectedType.value),
-      ),
-);
-
-// เลือกลูกค้าเพื่ออัปเดต master-detail panel
-const selectCustomer = (id) => {
-  activeId.value = id;
-};
-// แสดงการทำงานเดิมของปุ่มลงทะเบียนลูกค้าใหม่ด้วย dialog แบบ reactive
-const showNotice = (message) => window.alert(message);
+const { activeId, selectedType, isOpen, open, close, selectedCustomer, visibleCustomers, selectCustomer, showNotice } = useCustomerController();
 </script>
 
 <template>

@@ -14,7 +14,7 @@ const routes = [
   { path: '/payroll', name: 'payroll', component: EmployeePayrollView }
 ]
 
-// Router กลางของ frontend สำหรับแทนที่ลิงก์ HTML เดิม
+// Shared frontend router for replacing the old HTML links.
 export default createRouter({
   history: createWebHistory(),
   routes

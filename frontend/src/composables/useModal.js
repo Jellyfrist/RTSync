@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-// จัดการสถานะเปิดปิด dialog ที่ใช้ในหลายหน้า
+// Manage dialog open and close state shared by several pages.
 export function useModal() {
   const isOpen = ref(false)
   const open = () => { isOpen.value = true }

@@ -6,7 +6,7 @@ defineProps({
 </script>
 
 <template>
-  <!-- Icon กลางที่ใช้ SVG เท่านั้น เพื่อให้ทุกหน้ามีชุด icon เดียวกัน -->
+  <!-- Shared SVG icons keep one icon set across all pages -->
   <svg class="svg-icon" :width="size" :height="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <template v-if="name === 'search'"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></template>
     <template v-else-if="name === 'grid'"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></template>

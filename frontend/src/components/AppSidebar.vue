@@ -12,7 +12,7 @@ const items = [
 </script>
 
 <template>
-  <!-- เมนูหลักที่ใช้ร่วมกันทุกหน้า -->
+  <!-- Main menu shared by every page -->
   <aside class="app-sidebar">
     <div class="brand"><span class="brand-mark">RT</span><div><strong>RT Sync</strong><small>SOLAR WORKBENCH</small></div></div>
     <div class="sidebar-scroll">

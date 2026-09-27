@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 
-// กรองรายการตาม keyword โดยไม่ต้องควบคุม DOM โดยตรง
+// Filter records by a keyword without controlling the DOM directly.
 export function useSearch(items, fields = ['name']) {
   const query = ref('')
   const filteredItems = computed(() => {
