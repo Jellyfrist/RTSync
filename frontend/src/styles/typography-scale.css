@@ -1,0 +1,74 @@
+/* Global readability scale: keep hierarchy, increase the working text size. */
+body {
+  font-size: 15px;
+}
+
+h1 {
+  font-size: 24px;
+}
+
+h2 {
+  font-size: 21px;
+}
+
+h3 {
+  font-size: 17px;
+}
+
+small {
+  font-size: 13px;
+}
+
+label {
+  font-size: 14px;
+}
+
+input,
+select,
+textarea,
+.app-select-trigger {
+  font-size: 14px;
+}
+
+.button {
+  font-size: 13px;
+}
+
+.data-table {
+  font-size: 14px;
+}
+
+.data-table th {
+  font-size: 12px;
+}
+
+.table-pagination {
+  font-size: 13px;
+}
+
+.table-subtext,
+.field-helper,
+.form-helper,
+.section-caption {
+  font-size: 13px;
+}
+
+.page-title p,
+.task-table-heading .section-caption {
+  font-size: 14px;
+}
+
+.page-title .eyebrow {
+  font-size: 11px;
+}
+
+.table-filter-select,
+.app-select-option,
+.app-select-search input {
+  font-size: 13px;
+}
+
+.sidebar-nav a,
+.sidebar-link {
+  font-size: 13px;
+}

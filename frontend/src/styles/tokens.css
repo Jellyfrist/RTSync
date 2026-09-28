@@ -1,0 +1,23 @@
+/* ==================================================
+   01. RESET & GLOBAL
+   ================================================== */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap");
+:root {
+  --font-sans: "Noto Sans Thai", Tahoma, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --primary: #1e3a8a;
+  --primary-hover: #1d4ed8;
+  --secondary: #0284c7;
+  --surface: #fff;
+  --background: #f8fafc;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --control-height: 44px;
+  --control-radius: 8px;
+  --control-focus-ring: 0 0 0 3px rgb(2 132 199 / 16%);
+  --motion-fast: 160ms ease;
+}

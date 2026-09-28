@@ -1,0 +1,440 @@
+/* ==================================================
+   12. RESPONSIVE
+   ================================================== */
+@media (max-width: 1000px) {
+  .app-sidebar {
+    width: 220px;
+  }
+  .app-content {
+    margin-left: 220px;
+  }
+  .app-header {
+    left: 220px;
+  }
+  .kpi-grid.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .app-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+  }
+  .app-sidebar .sidebar-scroll {
+    display: none;
+  }
+  .app-shell {
+    display: block;
+  }
+  .app-content {
+    margin-left: 0;
+  }
+  .app-header {
+    left: 0;
+    position: sticky;
+    height: auto;
+    min-height: 62px;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .header-search {
+    width: 100%;
+  }
+
+  .page-content {
+    padding: 20px 14px 30px;
+  }
+  .page-title,
+  .detail-heading {
+    flex-direction: column;
+  }
+  .master-detail,
+  .payroll-workbench {
+    grid-template-columns: 1fr;
+  }
+  .kpi-grid,
+  .kpi-grid.four,
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  .button-row {
+    width: 100%;
+  }
+}
+
+/* ==================================================
+   13. RESPONSIVE SYSTEM OVERRIDES
+   Desktop 1024+, tablet 768-1023, phone <=767
+   ================================================== */
+html,
+body {
+  overflow-x: hidden;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+button,
+.button,
+.icon-button,
+.sidebar-nav a,
+.sidebar-link,
+.filter-tabs button,
+.inventory-tabs button {
+  min-height: 44px;
+}
+
+.data-table {
+  min-width: 720px;
+}
+
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app-sidebar {
+    width: 82px;
+  }
+
+  .app-content {
+    margin-left: 82px;
+  }
+
+  .app-header {
+    left: 82px;
+    padding-inline: 20px;
+  }
+
+  .sidebar-nav a span,
+  .sidebar-link span,
+  .section-label,
+  .user-panel > div:last-child {
+    display: none;
+  }
+
+  .sidebar-nav a,
+  .sidebar-link {
+    justify-content: center;
+    min-height: 48px;
+    padding-inline: 8px;
+  }
+
+  .user-panel {
+    justify-content: center;
+    padding-inline: 8px;
+  }
+
+  .page-content {
+    padding-inline: 20px;
+  }
+
+  .master-detail {
+    grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.3fr);
+  }
+
+  .kpi-grid.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .app-shell {
+    display: block;
+  }
+
+  .app-sidebar {
+    position: relative;
+    width: 100%;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app-shell.sidebar-collapsed .app-sidebar,
+  .app-shell.sidebar-collapsed .app-content {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .app-shell.sidebar-collapsed .app-header {
+    left: auto;
+  }
+
+  .sidebar-scroll {
+    display: block;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 10px 8px;
+  }
+
+  .app-sidebar .sidebar-scroll {
+    display: block;
+  }
+
+  .sidebar-topbar {
+    height: 50px;
+    justify-content: flex-start;
+    padding: 0 10px;
+  }
+
+  .section-label,
+  .section-label-spaced,
+  .sidebar-scroll > .sidebar-link {
+    display: none;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    gap: 6px;
+    width: max-content;
+  }
+
+  .sidebar-nav a {
+    min-height: 44px;
+    padding: 8px 12px;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .user-panel {
+    display: none;
+  }
+
+  .app-content {
+    margin-left: 0;
+  }
+
+  .app-header {
+    position: sticky;
+    left: auto;
+    z-index: 20;
+    min-height: 58px;
+    padding: 8px 12px;
+  }
+
+  .header-search {
+    width: 100%;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .page-content {
+    width: 100%;
+    padding: 18px 12px 32px;
+  }
+
+  .app-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+    margin: 0 12px;
+  }
+
+  .page-title {
+    gap: 14px;
+    margin-bottom: 16px;
+    padding: 4px 0 15px;
+  }
+
+  .page-title h1 {
+    font-size: clamp(20px, 6vw, 26px);
+  }
+
+  .page-title p {
+    max-width: 42ch;
+    line-height: 1.5;
+  }
+
+  .page-title > .button,
+  .page-title > .button-row,
+  .page-title .button-row .button {
+    width: 100%;
+  }
+
+  .button-row {
+    gap: 8px;
+  }
+
+  .button-row .button {
+    flex: 1 1 auto;
+  }
+
+  .panel,
+  .detail-card {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .panel-toolbar,
+  .detail-heading,
+  .inventory-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .master-detail,
+  .payroll-workbench,
+  .operations-calendar,
+  .service-grid,
+  .stock-report-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi-grid,
+  .kpi-grid.four,
+  .inventory-kpis,
+  .info-grid,
+  .reorder-grid,
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kpi-card,
+  .inventory-kpi {
+    min-height: 112px;
+  }
+
+  .task-table-heading {
+    flex-direction: column;
+  }
+
+  .task-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inventory-tabs,
+  .customer-tabs,
+  .operations-tabs {
+    gap: 6px;
+    padding: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .inventory-tabs button,
+  .customer-tabs button,
+  .operations-tabs button {
+    flex: 0 0 auto;
+    min-width: max-content;
+    padding-inline: 12px;
+    white-space: nowrap;
+  }
+
+  .filter-tabs {
+    display: flex;
+    gap: 6px;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 3px;
+  }
+
+  .filter-tabs button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .control-field--search,
+  .control-field--search input,
+  .supplier-product-link select {
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .schedule-strip {
+    grid-template-columns: repeat(4, minmax(116px, 1fr));
+    overflow-x: auto;
+    margin-inline: -4px;
+    padding-inline: 4px;
+  }
+
+  .calendar-day {
+    min-height: 64px;
+    padding: 7px;
+  }
+
+  .schedule-strip > div {
+    min-width: 116px;
+  }
+
+  .employee-list {
+    max-height: none;
+  }
+
+  .employee-card,
+  .customer-card {
+    min-height: 64px;
+  }
+
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal {
+    width: 100%;
+    max-height: 90dvh;
+    overflow-y: auto;
+    border-radius: 18px 18px 0 0;
+    padding: 22px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+
+  .toast {
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Tablet keeps the readable navigation expanded; users can collapse it manually. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app-sidebar {
+    width: 220px;
+  }
+
+  .app-content {
+    margin-left: 220px;
+  }
+
+  .app-header {
+    left: 220px;
+  }
+
+  .sidebar-nav a span,
+  .section-label,
+  .user-panel > div:last-child {
+    display: block;
+  }
+
+  .sidebar-nav a,
+  .user-panel {
+    justify-content: flex-start;
+  }
+
+  .sidebar-nav a,
+  .sidebar-link {
+    padding-inline: 11px;
+  }
+}
