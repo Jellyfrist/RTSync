@@ -1,4 +1,5 @@
 from app.schemas.base import ResponseModel
+from pydantic import BaseModel
 
 
 class Customer(ResponseModel):
@@ -11,3 +12,22 @@ class Customer(ResponseModel):
     location: str
     customer_type: str
     status: str
+    email: str = ""
+    tax_id: str = ""
+    contact_name: str = ""
+    address: dict = {}
+    system: str = ""
+
+
+class CustomerInput(BaseModel):
+    name: str
+    phone: str
+    location: str
+    customer_type: str
+    status: str = "รอเปิดบัญชี"
+    code: str | None = None
+    email: str = ""
+    tax_id: str = ""
+    contact_name: str = ""
+    address: dict = {}
+    system: str = ""

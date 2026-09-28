@@ -10,3 +10,8 @@ class Supplier:
     category: str
     delivery: str
     sku_count: int
+    description: str = ""
+    contact_name: str = ""
+    contact_phone: str = ""
+    contact_email: str = ""
+    payment_terms: str = ""

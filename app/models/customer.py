@@ -12,3 +12,8 @@ class Customer:
     location: str
     customer_type: str
     status: str
+    email: str = ""
+    tax_id: str = ""
+    contact_name: str = ""
+    address: dict = None
+    system: str = ""

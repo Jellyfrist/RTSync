@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, Float, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.database import Base
@@ -25,6 +25,8 @@ class ProductRecord(BaseModel):
     reorder_point: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     stock: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     price: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    cost_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    sale_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     supplier_links: Mapped[list["SupplierProductRecord"]] = relationship(back_populates="product", cascade="all, delete-orphan")
 
     @property
@@ -42,6 +44,11 @@ class CustomerRecord(BaseModel):
     location: Mapped[str] = mapped_column(String(255), nullable=False)
     customer_type: Mapped[str] = mapped_column(String(120), nullable=False)
     status: Mapped[str] = mapped_column(String(120), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    tax_id: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    contact_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    address: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    system: Mapped[str] = mapped_column(String(255), nullable=False, default="")
 
 
 class SupplierRecord(BaseModel):
@@ -52,6 +59,11 @@ class SupplierRecord(BaseModel):
     category: Mapped[str] = mapped_column(String(120), nullable=False)
     delivery: Mapped[str] = mapped_column(String(64), nullable=False)
     sku_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    description: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    contact_name: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    contact_phone: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    contact_email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    payment_terms: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     product_links: Mapped[list["SupplierProductRecord"]] = relationship(back_populates="supplier", cascade="all, delete-orphan")
 
 
@@ -72,6 +84,38 @@ class EmployeeRecord(BaseModel):
     role: Mapped[str] = mapped_column(String(255), nullable=False)
     salary: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     overtime_hours: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    overtime_rate: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    allowance: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+    deduction: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
+
+
+class CategoryRecord(BaseModel):
+    __tablename__ = "inventory_categories"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+
+
+class SupplierCategoryRecord(BaseModel):
+    __tablename__ = "supplier_categories"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+
+
+class OperationRecord(BaseModel):
+    """Persist UI workflows whose fields evolve independently from core inventory."""
+
+    __tablename__ = "operations"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    collection: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 class PurchaseOrderRecord(BaseModel):

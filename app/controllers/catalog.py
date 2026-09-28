@@ -32,7 +32,8 @@ def create_product(payload: CreateProductInput, session: SessionDependency):
     if session.get(ProductRecord, payload.sku) is not None:
         raise HTTPException(status_code=409, detail="Product SKU already exists.")
     record = ProductRecord(sku=payload.sku, name=payload.name, category=payload.category, unit=payload.unit,
-                           reorder_point=payload.reorder_point, price=payload.price, stock=0)
+                           reorder_point=payload.reorder_point, price=payload.price, stock=payload.stock,
+                           cost_price=payload.cost_price, sale_price=payload.sale_price)
     session.add(record)
     session.commit()
     return record

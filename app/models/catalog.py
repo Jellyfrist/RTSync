@@ -7,3 +7,5 @@ class CatalogSummary:
 
     total_products: int
     available_items: int
+    total_stock: int = 0
+    low_stock: int = 0

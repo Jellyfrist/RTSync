@@ -24,7 +24,7 @@ def get_suppliers(
 
 @router.post("", status_code=201, response_model=Supplier)
 def create_supplier(payload: CreateSupplierInput, session: SessionDependency):
-    record = SupplierRecord(id=str(uuid4()), name=payload.name, category=payload.category, delivery=payload.delivery, sku_count=0)
+    record = SupplierRecord(id=str(uuid4()), sku_count=0, **payload.model_dump())
     session.add(record)
     session.commit()
     return record
@@ -42,3 +42,15 @@ def link_product(supplier_id: str, sku: str, session: SessionDependency):
         session.commit()
         session.refresh(product)
     return product
+
+
+@router.delete("/{supplier_id}/products/{sku}", status_code=204)
+def unlink_product(supplier_id: str, sku: str, session: SessionDependency):
+    link = session.get(SupplierProductRecord, (supplier_id, sku))
+    if link is None:
+        raise HTTPException(status_code=404, detail="Supplier product link was not found.")
+    supplier = session.get(SupplierRecord, supplier_id)
+    session.delete(link)
+    if supplier is not None:
+        supplier.sku_count = max(0, supplier.sku_count - 1)
+    session.commit()
