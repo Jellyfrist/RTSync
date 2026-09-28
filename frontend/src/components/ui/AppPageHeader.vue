@@ -1,0 +1,20 @@
+<!-- Page heading pattern shared by every RTSync module. -->
+<script setup>
+defineProps({
+  eyebrow: { type: String, default: "" },
+  title: { type: String, required: true },
+  description: { type: String, default: "" },
+  className: { type: [String, Array, Object], default: "" },
+});
+</script>
+
+<template>
+  <header class="page-title" :class="className">
+    <div>
+      <span v-if="eyebrow" class="eyebrow">{{ eyebrow }}</span>
+      <h1>{{ title }}</h1>
+      <p v-if="description">{{ description }}</p>
+    </div>
+    <slot name="actions" />
+  </header>
+</template>

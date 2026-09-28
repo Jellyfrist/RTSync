@@ -9,4 +9,6 @@ class CatalogService(DirectoryService[Product]):
         return CatalogSummary(
             total_products=len(products),
             available_items=sum(product.stock for product in products),
+            total_stock=sum(product.stock for product in products),
+            low_stock=sum(product.stock <= product.reorder_point for product in products),
         )

@@ -14,3 +14,5 @@ class Product:
     unit: str = "ชิ้น"
     reorder_point: int = 0
     supplier_ids: tuple[str, ...] = ()
+    cost_price: Decimal | None = None
+    sale_price: Decimal | None = None
