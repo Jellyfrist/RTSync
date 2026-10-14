@@ -1,144 +1,95 @@
-# Deploy RT Sync to Vercel
+# RT Sync — Unified Vercel Services Deployment
 
-RT Sync consists of a Vue 3/Vite SPA (`frontend/`) and a FastAPI backend
-(`app/`) that uses PostgreSQL (Supabase). Deploy **two Vercel projects**
-from the **same GitHub repository** so they can have independent build
-settings and environment variables.
+This repository runs **Vue 3 + Vite** and **FastAPI** in **one Vercel project**, via [Vercel Services](https://vercel.com/kb/guide/vercel-services).
 
-> **Security warning:** The current FastAPI routes do not implement
-> authentication or authorization. The backend includes customer/employee
-> records and data-changing inventory, supplier and order endpoints.
-> **Do not deploy with real customer, employee or business data to a public
-> backend** until authentication and authorization are added. For a
-> classroom/demo deployment, use an isolated database containing only
-> non-sensitive sample data. Some frontend screens offer mock fallbacks,
-> but mock mode does not replace the backend for all actions.
+- Production domain: https://rt-sync.vercel.app
+- Vercel project: `rt-sync` (Vercel ID `prj_QvdauaWS8lwbnKjQKMb3azWlV4wX`)
+- GitHub: `Jellyfrist/RTSync`
+- Supabase: [RTSync database](https://supabase.com/dashboard/project/zbgomqxlqmcucekjccmt)
+- Backend: `https://rt-sync.vercel.app/api/*`
+- Frontend: `https://rt-sync.vercel.app/*`
 
-## 1. Use the existing RTSync Supabase project
+## Project architecture
 
-The designated database already exists:
+The root `vercel.json` defines two independently built services and orders
+the public rewrites so that FastAPI's `/api/*` paths take priority over the
+Vue catch-all. The Vite service at `frontend/` uses its existing SPA fallback
+configuration for Vue Router. The Python service at repository root imports
+`app.main:app` via `index.py`. The existing root `requirements.txt` and
+`.python-version` enable Python deployment.
 
-- Project dashboard: https://supabase.com/dashboard/project/zbgomqxlqmcucekjccmt
-- Project ID: `zbgomqxlqmcucekjccmt`
-- Region: `ap-northeast-1` (Tokyo)
-- PostgreSQL 17; existing schema with 26 public tables and persisted business data.
+The frontend's API client defaults to **relative `/api`**, not an absolute
+backend hostname. Requests stay same-origin, so cross-domain CORS is no longer
+needed for the web app. If `VITE_API_BASE_URL` is set on Vercel, set it to
+`/api` (not the old domain). Keep `VITE_USE_MOCK=false` so production errors
+are not disguised by local demo data.
 
-**Do not create a replacement project and do not run
-`python -m app.scripts.init_db` against this existing database.**
-The migration script changes existing columns/constraints and is not
-intended as a routine Vercel build command. Back up the database and
-review schema differences before any future DDL migration.
+## Environment variables
 
-In the Supabase project dashboard, click **Connect**, select the
-**Transaction Pooler** connection string (port `6543`, recommended for
-serverless applications), and copy the URI. For SQLAlchemy/Psycopg 3,
-use `postgresql+psycopg://` as the scheme. Supply it only as the
-backend Vercel environment variable `DATABASE_URL`.
-The backend's SQLAlchemy connection factory disables Psycopg automatic
-prepared statements when connecting on port 6543, as required by
-Supabase transaction pooling. For different database connection methods,
-review https://supabase.com/docs/guides/database/connecting-to-postgres
+Configure all variables on the **single Vercel project `rt-sync`**:
 
-### Existing database security: blocker for public launch
+| Name | Where | Value |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | Vite build | `/api` |
+| `VITE_USE_MOCK` | Vite build | `false` |
+| `APP_ENV` | Python service | `production` |
+| `API_PREFIX` | Python service | `/api` |
+| `FRONTEND_ORIGIN` | Python service | `https://rt-sync.vercel.app` |
+| `DATABASE_URL` | **Secret for Python only** | Existing Supabase PostgreSQL connection URI (Transaction Pooler, port 6543, scheme `postgresql+psycopg://`) |
 
-As checked on 2026-10-14, **all 26 tables in the `public` schema have
-Row Level Security disabled**, and the Supabase `anon` and
-`authenticated` database roles have broad table privileges. This is
-**not safe for production exposure via Supabase Data API**. Do not use
-the Supabase publishable/anon key for unrestricted client-side SQL
-access. The existing FastAPI API also lacks authentication/authorization.
+**Do not commit, paste into frontend code, or prefix database credentials
+with `VITE_`.** A Supabase project reference is NOT a database password.
+The database password/URI must be obtained by the owner from the Supabase
+**Connect → Transaction Pooler** page and saved as a sensitive/encrypted
+environment variable in the Vercel project. Redeploy after changes.
 
-**Do not publicly launch against real business/customer/employee data
-until access controls are designed and tested.** Possible remediation
-includes server-verified application login/role permissions and
-appropriate restriction of Supabase Data API grants/RLS policies.
-Enabling RLS without policies can block access and must be planned
-carefully; do not automatically run RLS changes on the live database.
-See https://supabase.com/docs/guides/database/postgres/row-level-security
+The backend's SQLAlchemy engine disables Psycopg prepared statements on
+transaction pooler connections, per Supabase's
+[connection guide](https://supabase.com/docs/guides/database/connecting-to-postgres).
 
-## 2. Deploy the FastAPI backend
+## Existing Supabase database — preserve data
 
-At [vercel.com/new](https://vercel.com/new), import
-`Jellyfrist/RTSync` and create a project named, for example,
-`rtsync-api`.
+Use only project ID `zbgomqxlqmcucekjccmt`. The database has 26 existing
+`public` tables and business data, including inventory, purchasing, field
+jobs, and invoices/quotes. **Never create another Supabase project, drop
+tables, or run `python -m app.scripts.init_db` automatically from the
+deployment pipeline.** The existing schema carries revisions in
+`public.schema_migrations`. Back up the database and review changes before
+any new schema migration.
 
-- **Root Directory:** repository root (`./`; do not select `app/`).
-- **Framework:** FastAPI / Python automatic detection.
-- **Build Command / Output Directory:** leave the framework defaults.
-- Entrypoint: `index.py` exports the existing `app.main:app` instance.
-- Python dependencies: root `requirements.txt` points to
-  `app/requirements.txt`.
-- Python version: `.python-version` pins Python 3.12.
+## Security requirements before public use
 
-Configure these **backend** environment variables on Vercel:
+**The single Vercel project must retain Vercel Authentication protection
+(`ssoProtection: all`) until a proper application login and authorization
+system is built and tested.** The current navigation header previously used
+a hard-coded `SUPER ADMIN` label; this is not proof of a logged-in user.
+The FastAPI routes do not yet authenticate users or check business roles.
 
-| Variable | Value |
-| --- | --- |
-| `DATABASE_URL` | Supabase RTSync Transaction Pooler URI, using `postgresql+psycopg://` |
-| `APP_ENV` | `production` |
-| `APP_NAME` | `RT Sync API` (optional) |
-| `API_PREFIX` | `/api` |
-| `FRONTEND_ORIGIN` | Your **frontend** production URL without the trailing slash |
+**Critical Supabase security risk:** 26 tables have RLS disabled and the
+Supabase `anon` and `authenticated` roles have broad table privileges.
+Do **not** expose a Supabase publishable/anon key to the browser while this
+is unresolved. The database must have appropriate grants/RLS and the
+application must enforce real user authentication and authorization
+before lifting deployment protection. Design and verify the RLS policy
+per business role before applying it; enabling RLS without policies can
+break existing applications. Never automatically change live RLS grants
+or existing data without review.
 
-When the backend finishes deploying, verify:
+Keep `DATABASE_URL` secret, enable database backups, monitor errors, and
+use least-privilege credentials in production. Deployment readiness does
+not mean authentication or database access is working.
 
-- `https://<your-backend-domain>/api/health` returns `{"status":"ok"}`.
-- `https://<your-backend-domain>/docs` displays the FastAPI API docs.
+## Verify (after setting the secret)
 
-Do not put a Supabase database password or `DATABASE_URL` in any
-`VITE_` variable.
+1. Check Vercel deployment is **READY** and project framework is **Services**.
+2. Open `https://rt-sync.vercel.app/` when signed into an authorized Vercel account.
+3. Check `https://rt-sync.vercel.app/api/health` is `{"status":"ok"}`.
+4. Check a Vue deep link, e.g. `/inventory`, refreshes successfully.
+5. After `DATABASE_URL` is set, test **read-only** `/api/inventory/products`
+   against the existing Supabase records behind Vercel Authentication.
+6. Test a representative write only after explicit approval, with a
+   reversible test record, and verify it appears in PostgreSQL.
 
-## 3. Deploy the Vue frontend
-
-Import the **same** `Jellyfrist/RTSync` repository again in Vercel
-as a second project named, for example, `rtsync-web`.
-
-- **Root Directory:** `frontend`.
-- **Framework Preset:** Vite.
-- **Install Command:** `npm ci`.
-- **Build Command:** `npm run build`.
-- **Output Directory:** `dist`.
-
-Configure these **frontend** environment variables:
-
-| Variable | Value |
-| --- | --- |
-| `VITE_API_BASE_URL` | `https://<your-backend-domain>/api` |
-| `VITE_USE_MOCK` | `false` for backend integration; `true` only for an intentionally partial UI demo |
-
-The `frontend/vercel.json` file rewrites deep links to
-`/index.html`, allowing `/customers`, `/inventory`, etc. to work
-when opened or refreshed directly.
-
-## 4. Connect the deployed projects
-
-1. Copy the production URL of the Vue frontend.
-2. Set the backend project's `FRONTEND_ORIGIN` to that exact origin,
-   for example `https://rtsync-web.vercel.app` (no trailing slash).
-3. Redeploy the backend after updating the environment variable.
-4. Confirm `VITE_API_BASE_URL` on the frontend ends in `/api` and
-   redeploy the frontend if you changed it.
-5. Visit the frontend and check API traffic in the browser Network tab.
-
-Because the existing CORS configuration permits one configured frontend
-origin (plus local development URLs), branch preview domains may need
-separate CORS configuration.
-
-## 5. Troubleshooting
-
-- **Vue page returns 404 on refresh:** confirm the frontend Vercel
-  project's root directory is `frontend`, so its `vercel.json`
-  rewrite is applied.
-- **Requests go to localhost in production:** set
-  `VITE_API_BASE_URL` in the frontend project and redeploy. Vite embeds
-  these values at **build** time.
-- **CORS errors:** check `FRONTEND_ORIGIN` on the backend matches the
-  frontend origin exactly, without a trailing slash, and redeploy.
-- **API returns 500 / database error:** check `DATABASE_URL`, pooler
-  network access, database credentials and whether `init_db` has run.
-- **Backend import/build error:** ensure the backend project's root
-  directory is the repository root, not `app/` or `frontend/`.
-
-Production deployment should be considered incomplete until access
-control, Supabase database privileges/RLS, error monitoring, backups, and
-a versioned database migration strategy are in place.
+The old `rtsync-web` and `rtsync-api` domains are not needed when
+the unified project is validated. Keep any legacy project as a
+rollback option until the unified deployment is proven healthy.
