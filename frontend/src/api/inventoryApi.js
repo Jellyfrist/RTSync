@@ -117,7 +117,10 @@ export const inventoryApi = {
           },
         ),
       );
-    } catch {
+    } catch (error) {
+      // In production, never fake a successful stock receipt if the API failed.
+      // Only the intentionally enabled offline demo may update mock records.
+      if (!isMockEnabled()) throw error;
       const product = mockDb.get("products").find((item) => item.sku === sku);
       const record = appendCostLot(
         {
