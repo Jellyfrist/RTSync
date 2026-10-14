@@ -1,6 +1,6 @@
 // ไฟล์นี้รวมฟังก์ชันเรียก REST API และจัดการข้อผิดพลาดกลางของ frontend
 const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+  import.meta.env.VITE_API_BASE_URL || "/api";
 export const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 export async function request(path, options = {}) {
