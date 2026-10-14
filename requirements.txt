@@ -1,0 +1,2 @@
+# Install the same backend dependencies locally and on Vercel.
+-r app/requirements.txt
