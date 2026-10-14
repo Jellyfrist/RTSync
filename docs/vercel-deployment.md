@@ -14,24 +14,47 @@ settings and environment variables.
 > non-sensitive sample data. Some frontend screens offer mock fallbacks,
 > but mock mode does not replace the backend for all actions.
 
-## 1. Prepare an isolated PostgreSQL database
+## 1. Use the existing RTSync Supabase project
 
-1. Create a Supabase project (or use a separate demo database).
-2. Copy the PostgreSQL connection string from your Supabase dashboard and
-   make sure it uses the `postgresql+psycopg://` SQLAlchemy driver prefix.
-   When deploying a serverless backend, use the Supabase pooler connection
-   details appropriate for your project.
-3. **Before deployment**, initialize the schema from your local machine
-   (or a controlled CI/migration job):
+The designated database already exists:
 
-   ```bash
-   python -m pip install -r app/requirements.txt
-   DATABASE_URL='postgresql+psycopg://...' python -m app.scripts.init_db
-   ```
+- Project dashboard: https://supabase.com/dashboard/project/zbgomqxlqmcucekjccmt
+- Project ID: `zbgomqxlqmcucekjccmt`
+- Region: `ap-northeast-1` (Tokyo)
+- PostgreSQL 17; existing schema with 26 public tables and persisted business data.
 
-   `init_db` may alter tables and numeric columns in an existing database.
-   Back up existing data first. Never run migrations automatically on
-   every serverless request.
+**Do not create a replacement project and do not run
+`python -m app.scripts.init_db` against this existing database.**
+The migration script changes existing columns/constraints and is not
+intended as a routine Vercel build command. Back up the database and
+review schema differences before any future DDL migration.
+
+In the Supabase project dashboard, click **Connect**, select the
+**Transaction Pooler** connection string (port `6543`, recommended for
+serverless applications), and copy the URI. For SQLAlchemy/Psycopg 3,
+use `postgresql+psycopg://` as the scheme. Supply it only as the
+backend Vercel environment variable `DATABASE_URL`.
+The backend's SQLAlchemy connection factory disables Psycopg automatic
+prepared statements when connecting on port 6543, as required by
+Supabase transaction pooling. For different database connection methods,
+review https://supabase.com/docs/guides/database/connecting-to-postgres
+
+### Existing database security: blocker for public launch
+
+As checked on 2026-10-14, **all 26 tables in the `public` schema have
+Row Level Security disabled**, and the Supabase `anon` and
+`authenticated` database roles have broad table privileges. This is
+**not safe for production exposure via Supabase Data API**. Do not use
+the Supabase publishable/anon key for unrestricted client-side SQL
+access. The existing FastAPI API also lacks authentication/authorization.
+
+**Do not publicly launch against real business/customer/employee data
+until access controls are designed and tested.** Possible remediation
+includes server-verified application login/role permissions and
+appropriate restriction of Supabase Data API grants/RLS policies.
+Enabling RLS without policies can block access and must be planned
+carefully; do not automatically run RLS changes on the live database.
+See https://supabase.com/docs/guides/database/postgres/row-level-security
 
 ## 2. Deploy the FastAPI backend
 
@@ -51,7 +74,7 @@ Configure these **backend** environment variables on Vercel:
 
 | Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | Your demo Supabase PostgreSQL connection URI, using `postgresql+psycopg://` |
+| `DATABASE_URL` | Supabase RTSync Transaction Pooler URI, using `postgresql+psycopg://` |
 | `APP_ENV` | `production` |
 | `APP_NAME` | `RT Sync API` (optional) |
 | `API_PREFIX` | `/api` |
@@ -117,5 +140,5 @@ separate CORS configuration.
   directory is the repository root, not `app/` or `frontend/`.
 
 Production deployment should be considered incomplete until access
-control, error monitoring, backups, and a versioned database migration
-strategy are in place.
+control, Supabase database privileges/RLS, error monitoring, backups, and
+a versioned database migration strategy are in place.
