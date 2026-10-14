@@ -4,7 +4,6 @@ import { ref, watch } from "vue";
 import AppHeader from "./AppHeader.vue";
 import AppSidebar from "./AppSidebar.vue";
 import AppFooter from "./AppFooter.vue";
-import { USE_MOCK } from "../../api/httpClient";
 
 defineProps({});
 
@@ -25,17 +24,7 @@ watch(sidebarCollapsed, (collapsed) => {
     />
     <div class="app-content">
       <AppHeader />
-      <main class="page-content">
-        <div
-          v-if="USE_MOCK"
-          role="status"
-          style="margin-bottom: 16px; padding: 12px 16px; border: 1px solid #bad4ed; border-radius: 8px; background: #eff6ff; color: #173e70; font-size: 14px;"
-        >
-          โหมดสาธิตสาธารณะ — ใช้ข้อมูลตัวอย่างที่เก็บในเบราว์เซอร์ของคุณ
-          ไม่มีการบันทึกข้อมูลลง Supabase และไม่ต้องเข้าสู่ระบบ
-        </div>
-        <slot />
-      </main>
+      <main class="page-content"><slot /></main>
       <AppFooter />
     </div>
   </div>
