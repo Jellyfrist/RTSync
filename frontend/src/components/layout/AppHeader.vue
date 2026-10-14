@@ -2,7 +2,6 @@
 <script setup>
 import { ref } from "vue";
 import SvgIcon from "../SvgIcon.vue";
-import { USE_MOCK } from "../../api/httpClient";
 
 const userMenuOpen = ref(false);
 const currentUser = {
@@ -22,8 +21,7 @@ const currentUser = {
       <strong>RTSync</strong>
     </div>
     <div class="header-actions">
-      <span v-if="USE_MOCK" class="demo-label">RTSync DEMO · ไม่ต้องเข้าสู่ระบบ</span>
-      <div v-else class="user-menu">
+      <div class="user-menu">
         <button
           class="user-menu-trigger"
           type="button"
