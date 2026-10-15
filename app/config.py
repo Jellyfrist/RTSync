@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     database_url: str = ""
     # Opt-in Google login; Vercel Authentication stays enabled until activated.
     rtsync_auth_required: bool = False
+    # Two seeded demonstration accounts: PBKDF2(salt:hash) is stored only in
+    # Vercel environment variables; plaintext passwords are never committed.
+    rtsync_owner_password_hash: str = ""
+    rtsync_employee_password_hash: str = ""
+    rtsync_session_secret: str = ""
     rtsync_allowed_emails: str = ""
     # Email-based, server-side RBAC; never trust a role sent by the browser.
     rtsync_owner_emails: str = ""
