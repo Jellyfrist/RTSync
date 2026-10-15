@@ -4,12 +4,20 @@ import { mockDb } from "./mockDb";
 import { appendCostLot } from "./pricingPolicy";
 
 // ปรับชื่อข้อมูลจาก backend ให้ตรงกับรูปแบบที่คอมโพเนนต์ใช้
-const normalizeProduct = (product) => ({
-  ...product,
-  reorderPoint: product.reorderPoint ?? product.reorder_point,
-  costPrice: product.costPrice ?? product.cost_price,
-  salePrice: product.salePrice ?? product.sale_price,
-});
+const normalizeProduct = (product) => {
+  const stock = Number(product.stock ?? 0);
+  const reorderPoint = Number(
+    product.reorderPoint ?? product.reorder_point ?? 0,
+  );
+  return {
+    ...product,
+    stock,
+    reorderPoint,
+    costPrice: product.costPrice ?? product.cost_price,
+    salePrice: product.salePrice ?? product.sale_price,
+    status: stock <= reorderPoint ? "ต้องสั่งเพิ่ม" : "พร้อมขาย",
+  };
+};
 
 export const inventoryApi = {
   // ดึงหมวดหมู่สินค้าจากฐานข้อมูล

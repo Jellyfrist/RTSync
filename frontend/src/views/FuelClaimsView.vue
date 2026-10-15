@@ -250,14 +250,21 @@ function saveFuelSource() {
 }
 async function saveClaim() {
   if (
+    !form.value.source ||
+    !form.value.employee ||
+    !form.value.date ||
     !form.value.job.trim() ||
     !form.value.vehicle.trim() ||
     !form.value.routeFrom.trim() ||
     !form.value.routeTo.trim() ||
-    !form.value.amount ||
     !form.value.receipt.trim()
   ) {
-    notify("กรุณากรอกเลขที่งาน รถ เส้นทาง ยอดเงิน และเลขที่ใบเสร็จ");
+    notify("กรุณากรอกประเภทงาน พนักงาน วันที่ งาน รถ เส้นทาง และเลขที่ใบเสร็จ");
+    return;
+  }
+  const amount = Number(form.value.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    notify("ยอดเงินต้องเป็นตัวเลขที่มากกว่า 0");
     return;
   }
   const compactDate = form.value.date.replaceAll("-", "").slice(2);
@@ -266,7 +273,7 @@ async function saveClaim() {
     id: `FUEL-${compactDate}-${String(claims.value.length + 1).padStart(2, "0")}`,
     ...claimForm,
     route: `${routeFrom.trim()} → ${routeTo.trim()}`,
-    amount: Number(form.value.amount),
+    amount,
     status: "รอตรวจสอบ",
   };
   claims.value.unshift(await operationsApi.create("fuelClaims", claim));
@@ -280,10 +287,28 @@ function openClaimEdit(claim) {
 }
 async function saveClaimEdit() {
   if (!editingClaim.value) return;
+  if (
+    !editForm.value.source ||
+    !editForm.value.employee ||
+    !editForm.value.date ||
+    !editForm.value.job.trim() ||
+    !editForm.value.vehicle.trim() ||
+    !editForm.value.routeFrom.trim() ||
+    !editForm.value.routeTo.trim() ||
+    !editForm.value.receipt.trim()
+  ) {
+    notify("กรุณากรอกประเภทงาน พนักงาน วันที่ งาน รถ เส้นทาง และเลขที่ใบเสร็จ");
+    return;
+  }
+  const amount = Number(editForm.value.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    notify("ยอดเงินต้องเป็นตัวเลขที่มากกว่า 0");
+    return;
+  }
   Object.assign(editingClaim.value, {
     ...editForm.value,
     route: `${editForm.value.routeFrom.trim()} → ${editForm.value.routeTo.trim()}`,
-    amount: Number(editForm.value.amount),
+    amount,
   });
   await operationsApi.update("fuelClaims", editingClaim.value.id, editingClaim.value);
   showEditModal.value = false;

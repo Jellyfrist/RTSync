@@ -22,10 +22,20 @@ const normalizeCustomer = (customer) => ({
 });
 const normalizeSupplier = (supplier) => ({
   ...supplier,
-  contactName: supplier.contactName ?? supplier.contact_name ?? "",
-  contactPhone: supplier.contactPhone ?? supplier.contact_phone ?? "",
-  contactEmail: supplier.contactEmail ?? supplier.contact_email ?? "",
-  paymentTerms: supplier.paymentTerms ?? supplier.payment_terms ?? "ยังไม่ระบุ",
+  contactName:
+    supplier.contactName || supplier.contact_name || supplier.contact || "",
+  contactPhone:
+    supplier.contactPhone ||
+    supplier.contact_phone ||
+    supplier.phone ||
+    "",
+  contactEmail:
+    supplier.contactEmail ||
+    supplier.contact_email ||
+    supplier.email ||
+    supplier.email_address ||
+    "",
+  paymentTerms: supplier.paymentTerms || supplier.payment_terms || "ยังไม่ระบุ",
 });
 
 const supplierPayload = (supplier) => ({
@@ -91,10 +101,12 @@ export const peopleApi = {
   // เพิ่มซัพพลายเออร์ใหม่ลงฐานข้อมูล
   createSupplier: async (supplier) => {
     try {
-      return await request("/suppliers", {
-        method: "POST",
-        body: JSON.stringify(supplierPayload(supplier)),
-      });
+      return normalizeSupplier(
+        await request("/suppliers", {
+          method: "POST",
+          body: JSON.stringify(supplierPayload(supplier)),
+        }),
+      );
     } catch (error) {
       if (!isMockEnabled()) throw error;
       const record = normalizeSupplier({
@@ -119,8 +131,13 @@ export const peopleApi = {
     request("/customers", { method: "POST", body: JSON.stringify({ ...customer, customer_type: customer.customer_type ?? customer.type }) }),
   updateCustomer: (id, customer) =>
     request(`/customers/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ ...customer, customer_type: customer.customer_type ?? customer.type }) }),
-  updateSupplier: (id, supplier) =>
-    request(`/suppliers/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(supplierPayload(supplier)) }),
+  updateSupplier: async (id, supplier) =>
+    normalizeSupplier(
+      await request(`/suppliers/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(supplierPayload(supplier)),
+      }),
+    ),
   linkProduct: (supplierId, sku) =>
     request(`/suppliers/${encodeURIComponent(supplierId)}/products/${encodeURIComponent(sku)}`, { method: "POST" }),
   unlinkProduct: (supplierId, sku) =>

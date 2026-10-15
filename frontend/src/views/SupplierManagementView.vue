@@ -58,9 +58,18 @@ const visibleSuppliers = computed(() =>
         item.category === supplierCategoryFilter.value),
   ),
 );
+const supplierCategoryOptions = computed(() => {
+  const options = [
+    ...supplierCategories.value,
+    ...suppliers.value.map((supplier) => ({ name: supplier.category })),
+  ].filter((category) => category.name);
+  return [
+    ...new Map(options.map((category) => [category.name, category])).values(),
+  ];
+});
 const filteredSupplierCategories = computed(() => {
   const query = supplierCategoryFilterQuery.value.toLowerCase().trim();
-  return supplierCategories.value.filter((category) =>
+  return supplierCategoryOptions.value.filter((category) =>
     category.name.toLowerCase().includes(query),
   );
 });
@@ -134,7 +143,28 @@ function toggleSupplier(supplierId) {
   selectedId.value = selectedId.value === supplierId ? "" : supplierId;
 }
 function openEdit() {
-  form.value = { ...selectedSupplier.value };
+  const supplier = selectedSupplier.value;
+  if (!supplier) return;
+  form.value = {
+    name: supplier.name || "",
+    category: supplier.category || "",
+    description: supplier.description || "",
+    contactName: supplier.contactName || supplier.contact_name || "",
+    contactPhone:
+      supplier.contactPhone ||
+      supplier.contact_phone ||
+      supplier.phone ||
+      "",
+    contactEmail:
+      supplier.contactEmail ||
+      supplier.contact_email ||
+      supplier.email ||
+      supplier.email_address ||
+      "",
+    delivery: supplier.delivery || "",
+    paymentTerms:
+      supplier.paymentTerms || supplier.payment_terms || "",
+  };
   editingSupplier.value = selectedSupplier.value;
   open();
 }
@@ -167,7 +197,10 @@ async function saveSupplier() {
       selectedId.value = supplier.id;
       close();
       if (route.query.from === "inventory") {
-        router.push({ path: "/inventory", query: { supplier: supplier.name } });
+        router.push({
+          path: "/inventory",
+          query: { supplierId: String(supplier.id) },
+        });
         return;
       }
     } catch (error) {
@@ -258,7 +291,7 @@ async function completePurchaseOrder(order) {
           </div>
           <div>
             <span>หมวดหมู่คู่ค้า</span
-            ><strong>{{ supplierCategories.length }} <small>หมวด</small></strong
+            ><strong>{{ supplierCategoryOptions.length }} <small>หมวด</small></strong
             ><small>จัดการจากฐานข้อมูล</small>
           </div>
           <div>
@@ -718,7 +751,7 @@ async function completePurchaseOrder(order) {
               <AppSelect
                 v-model="form.category"
                 :options="
-                  supplierCategories.map((category) => ({
+                  supplierCategoryOptions.map((category) => ({
                     value: category.name,
                     label: category.name,
                   }))

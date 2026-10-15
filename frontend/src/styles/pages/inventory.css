@@ -388,6 +388,29 @@
 .reorder-actions .button {
   white-space: nowrap;
 }
+.selected-purchase-summary {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  color: var(--primary);
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.selected-purchase-summary ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.selected-purchase-summary li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-size: 13px;
+}
 .reorder-table-wrap {
   border: 1px solid var(--border);
   border-radius: 8px;

@@ -168,6 +168,15 @@ const filteredSalesOrders = computed(() => {
 // นัดหมายและใบงานที่โหลดจาก backend
 const appointments = ref([]);
 const serviceTickets = ref([]);
+const workCustomerOptions = computed(() =>
+  [
+    ...customerOptions.value,
+    ...appointments.value.map((item) => item.customer),
+    ...serviceTickets.value.map((item) => item.customer),
+  ]
+    .filter(Boolean)
+    .filter((name, index, names) => names.indexOf(name) === index),
+);
 const pendingAppointments = computed(
   () => appointments.value.filter((item) => item.status !== "เสร็จสิ้น").length,
 );
@@ -283,6 +292,10 @@ onMounted(async () => {
     customerOptions.value = customerRecords.map((item) => item.name).filter(Boolean);
     if (!customerOptions.value.includes(quotationForm.value.customer))
       quotationForm.value.customer = customerOptions.value[0] || "";
+    if (!workCustomerOptions.value.includes(newAppointment.value.customer))
+      newAppointment.value.customer = "";
+    if (!workCustomerOptions.value.includes(newTicket.value.customer))
+      newTicket.value.customer = "";
   } catch (error) {
     quotationLoadError.value = error.message || "ไม่สามารถดึงข้อมูลใบเสนอราคาได้";
   }
@@ -625,10 +638,14 @@ async function saveEdit() {
   notify(`บันทึกรายละเอียด ${editingJob.value.id} แล้ว`);
 }
 async function createTicket() {
+  if (!newTicket.value.customer)
+    return notify("กรุณาเลือกลูกค้าสำหรับใบงานบริการ");
   if (!newTicket.value.subject.trim()) return notify("กรุณาระบุหัวข้อปัญหา");
   if (!newTicket.value.date) return notify("กรุณาเลือกวันที่เข้าบริการ");
   if (newTicket.value.time === "กำหนดเอง" && !customServiceTime.value.trim())
     return notify("กรุณาระบุช่วงเวลาเข้าบริการ");
+  if (newTicket.value.time !== "กำหนดเอง" && !newTicket.value.time)
+    return notify("กรุณาเลือกช่วงเวลาเข้าบริการ");
   if (!newTicket.value.employees.length)
     return notify("กรุณาเลือกพนักงานอย่างน้อย 1 คน");
   const ticket = {
@@ -660,7 +677,16 @@ function closeTicket(ticket) {
   notify(`${ticket.id} ปิดงานเรียบร้อย`);
 }
 async function createAppointment() {
+  if (!newAppointment.value.customer)
+    return notify("กรุณาเลือกลูกค้าสำหรับนัดหมาย");
   if (!newAppointment.value.date) return notify("กรุณาเลือกวันที่นัดหมาย");
+  if (
+    newAppointment.value.time === "กำหนดเอง" &&
+    !customAppointmentTime.value.trim()
+  )
+    return notify("กรุณาระบุช่วงเวลานัดหมาย");
+  if (newAppointment.value.time !== "กำหนดเอง" && !newAppointment.value.time)
+    return notify("กรุณาเลือกช่วงเวลานัดหมาย");
   if (!newAppointment.value.employees.length)
     return notify("กรุณาเลือกพนักงานอย่างน้อย 1 คน");
   const appointment = {
@@ -1320,6 +1346,7 @@ async function createAppointment() {
     >
       <form
         class="modal product-form-modal"
+        novalidate
         @submit.prevent="createAppointment"
       >
         <div class="modal-heading">
@@ -1343,7 +1370,7 @@ async function createAppointment() {
           >ลูกค้า
           <AppSelect
             v-model="newAppointment.customer"
-            :options="customerOptions"
+            :options="workCustomerOptions"
             placeholder="เลือกลูกค้า"
             search-placeholder="ค้นหาชื่อลูกค้า..."
             aria-label="เลือกลูกค้าสำหรับนัดหมายติดตั้ง"
@@ -1676,7 +1703,11 @@ async function createAppointment() {
         class="modal-backdrop"
         @click.self="showServiceForm = false"
       >
-        <form class="modal service-modal" @submit.prevent="createTicket">
+        <form
+          class="modal service-modal"
+          novalidate
+          @submit.prevent="createTicket"
+        >
           <div class="modal-heading">
             <div>
               <span class="eyebrow">SERVICE TICKET</span>
@@ -1698,7 +1729,7 @@ async function createAppointment() {
             >ลูกค้า
             <AppSelect
               v-model="newTicket.customer"
-              :options="customerOptions"
+              :options="workCustomerOptions"
               placeholder="เลือกลูกค้า"
               search-placeholder="ค้นหาชื่อลูกค้า..."
               aria-label="เลือกลูกค้าสำหรับใบงานบริการ"

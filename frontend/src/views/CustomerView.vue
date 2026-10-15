@@ -225,8 +225,10 @@ function saveCustomerType() {
   showCustomerTypeModal.value = false;
 }
 async function saveCustomer() {
-  if (!customerForm.value.name.trim() || !customerForm.value.phone.trim())
-    return;
+  if (!customerForm.value.name.trim())
+    return showNotice("กรุณากรอกชื่อลูกค้า");
+  if (!customerForm.value.phone.trim())
+    return showNotice("กรุณากรอกเบอร์โทรศัพท์");
   if (
     customerForm.value.type === "ธุรกิจ/โรงงาน" &&
     !customerForm.value.contactName.trim()
@@ -807,13 +809,13 @@ function issueReceipt() {
       <TablePagination :total="visibleCustomers.length" label="รายการลูกค้า" />
     </section>
     <div v-if="isOpen" class="modal-backdrop" @click.self="close">
-      <div class="modal product-form-modal">
+      <form class="modal product-form-modal" @submit.prevent="saveCustomer">
         <div class="modal-heading">
           <div>
             <span class="eyebrow">CUSTOMER REGISTRATION</span>
             <h2>ลงทะเบียนลูกค้าใหม่</h2>
           </div>
-          <button class="icon-button" @click="close">
+          <button type="button" class="icon-button" @click="close">
             <SvgIcon name="close" />
           </button>
         </div>
@@ -925,12 +927,12 @@ function issueReceipt() {
           </div>
         </div>
         <div class="button-row end">
-          <button class="button secondary" @click="close">ยกเลิก</button
-          ><button class="button primary" @click="saveCustomer">
+          <button type="button" class="button secondary" @click="close">ยกเลิก</button
+          ><button type="submit" class="button primary">
             บันทึกลูกค้า
           </button>
         </div>
-      </div>
+      </form>
     </div>
     <div
       v-if="showCustomerTypeModal"

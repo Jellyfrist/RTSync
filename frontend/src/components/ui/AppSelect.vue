@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import SvgIcon from "@/components/SvgIcon.vue";
 
 const props = defineProps({
@@ -15,8 +15,11 @@ const props = defineProps({
 });
 const emit = defineEmits(["update:modelValue", "change"]);
 const root = ref(null);
+const menu = ref(null);
 const open = ref(false);
 const query = ref("");
+const menuStyle = ref({});
+let trackingMenuPosition = false;
 const normalizedOptions = computed(() =>
   props.options.map((option) =>
     typeof option === "object" ? option : { value: option, label: option },
@@ -36,8 +39,15 @@ const visibleOptions = computed(() => {
 });
 function toggle() {
   if (props.disabled) return;
-  open.value = !open.value;
-  if (open.value) query.value = "";
+  if (open.value) {
+    closeMenu();
+    return;
+  }
+
+  open.value = true;
+  query.value = "";
+  startTrackingMenuPosition();
+  nextTick(updateMenuPosition);
 }
 function choose(option) {
   emit("update:modelValue", option.value);
@@ -47,12 +57,65 @@ function choose(option) {
 function closeMenu() {
   open.value = false;
   query.value = "";
+  stopTrackingMenuPosition();
 }
 function closeOnOutside(event) {
-  if (root.value && !root.value.contains(event.target)) open.value = false;
+  if (root.value?.contains(event.target) || menu.value?.contains(event.target)) {
+    return;
+  }
+  closeMenu();
+}
+function updateMenuPosition() {
+  if (!open.value || !root.value) return;
+
+  const trigger = root.value.querySelector(".app-select-trigger");
+  if (!trigger) return;
+
+  const rect = trigger.getBoundingClientRect();
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = window.innerHeight;
+  const edge = 8;
+  const gap = 8;
+  const below = Math.max(0, viewportHeight - rect.bottom - gap - edge);
+  const above = Math.max(0, rect.top - gap - edge);
+  const openAbove = below < 220 && above > below;
+  const availableHeight = openAbove ? above : below;
+  const width = Math.min(rect.width, Math.max(0, viewportWidth - edge * 2));
+  const left = Math.min(
+    Math.max(edge, rect.left),
+    Math.max(edge, viewportWidth - edge - width),
+  );
+
+  menuStyle.value = {
+    left: `${left}px`,
+    width: `${width}px`,
+    maxHeight: `${Math.max(80, Math.min(320, availableHeight))}px`,
+    ...(openAbove
+      ? { bottom: `${viewportHeight - rect.top + gap}px` }
+      : { top: `${rect.bottom + gap}px` }),
+  };
+}
+function startTrackingMenuPosition() {
+  if (trackingMenuPosition) return;
+  trackingMenuPosition = true;
+  window.addEventListener("resize", updateMenuPosition);
+  window.addEventListener("scroll", updateMenuPosition, true);
+  window.visualViewport?.addEventListener("resize", updateMenuPosition);
+  window.visualViewport?.addEventListener("scroll", updateMenuPosition);
+}
+function stopTrackingMenuPosition() {
+  if (!trackingMenuPosition) return;
+  trackingMenuPosition = false;
+  window.removeEventListener("resize", updateMenuPosition);
+  window.removeEventListener("scroll", updateMenuPosition, true);
+  window.visualViewport?.removeEventListener("resize", updateMenuPosition);
+  window.visualViewport?.removeEventListener("scroll", updateMenuPosition);
 }
 onMounted(() => document.addEventListener("click", closeOnOutside));
-onBeforeUnmount(() => document.removeEventListener("click", closeOnOutside));
+onBeforeUnmount(() => {
+  document.removeEventListener("click", closeOnOutside);
+  stopTrackingMenuPosition();
+});
 </script>
 
 <template>
@@ -75,36 +138,44 @@ onBeforeUnmount(() => document.removeEventListener("click", closeOnOutside));
       }}</span>
       <SvgIcon name="chevron-right" size="16" />
     </button>
-    <div v-if="open" class="app-select-menu" role="listbox">
-      <div v-if="searchable" class="app-select-search">
-        <SvgIcon name="search" size="17" />
-        <input
-          v-model="query"
-          type="search"
-          :placeholder="searchPlaceholder"
-          :aria-label="searchPlaceholder"
-          @click.stop
-        />
-      </div>
-      <button
-        v-for="option in visibleOptions"
-        :key="String(option.value)"
-        type="button"
-        class="app-select-option"
-        :class="{ selected: String(option.value) === String(modelValue) }"
-        role="option"
-        :aria-selected="String(option.value) === String(modelValue)"
-        @click="choose(option)"
+    <Teleport to="body">
+      <div
+        v-if="open"
+        ref="menu"
+        class="app-select-menu"
+        role="listbox"
+        :style="menuStyle"
       >
-        {{ option.label }}
-      </button>
-      <p v-if="!visibleOptions.length" class="app-select-empty">
-        ไม่พบข้อมูลที่ค้นหา
-      </p>
-      <div v-if="$slots['menu-footer']" class="app-select-menu-footer">
-        <slot name="menu-footer" :close="closeMenu" />
+        <div v-if="searchable" class="app-select-search">
+          <SvgIcon name="search" size="17" />
+          <input
+            v-model="query"
+            type="search"
+            :placeholder="searchPlaceholder"
+            :aria-label="searchPlaceholder"
+            @click.stop
+          />
+        </div>
+        <button
+          v-for="option in visibleOptions"
+          :key="String(option.value)"
+          type="button"
+          class="app-select-option"
+          :class="{ selected: String(option.value) === String(modelValue) }"
+          role="option"
+          :aria-selected="String(option.value) === String(modelValue)"
+          @click="choose(option)"
+        >
+          {{ option.label }}
+        </button>
+        <p v-if="!visibleOptions.length" class="app-select-empty">
+          ไม่พบข้อมูลที่ค้นหา
+        </p>
+        <div v-if="$slots['menu-footer']" class="app-select-menu-footer">
+          <slot name="menu-footer" :close="closeMenu" />
+        </div>
       </div>
-    </div>
+    </Teleport>
     <input
       v-if="required"
       class="app-select-required"

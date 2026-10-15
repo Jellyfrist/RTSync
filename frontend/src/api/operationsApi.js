@@ -16,12 +16,18 @@ export const operationsApi = {
   // ดึงสินค้าแนะนำสำหรับใบเสนอราคา
   getCatalog: async () => {
     try {
-      // Use the real product catalog rather than the unrelated operations collection.
-      // This keeps quotation product options aligned with Inventory/Supabase.
-      return (await inventoryApi.getProducts()).map((product) => ({
-        ...product,
-        price: Number(product.salePrice ?? product.price ?? 0),
-      }));
+      // Keep the cost basis in price and expose the offer price separately.
+      // Replacing price with the sale price makes margin previews use the
+      // offer itself as its cost basis.
+      return (await inventoryApi.getProducts()).map((product) => {
+        const costPrice = Number(
+          product.costPrice ?? product.cost_price ?? product.price ?? 0,
+        );
+        const salePrice = Number(
+          product.salePrice ?? product.sale_price ?? product.price ?? 0,
+        );
+        return { ...product, costPrice, salePrice };
+      });
     } catch (error) {
       if (!isMockEnabled()) throw error;
       return mockDb.get("catalog");

@@ -31,7 +31,7 @@ const receivingProduct = ref(null);
 const receiveAmount = ref(10);
 const receiveUnitCost = ref(0);
 const toast = ref(null);
-const selectedReorderSkus = ref([]);
+const selectedPurchaseSkus = ref([]);
 const isCreatingPurchaseOrder = ref(false);
 const showManualPurchaseModal = ref(false);
 const manualPurchaseSearch = ref("");
@@ -54,16 +54,21 @@ const form = ref({
   unit: "ชิ้น",
   price: 0,
   salePrice: 0,
-  supplier: "",
+  supplierId: "",
 });
 const { query, filteredItems } = useSearch(products, [
   "sku",
   "name",
   "category",
+  "supplier",
 ]);
 const categories = ref(["ทั้งหมด"]);
+const registeredCategories = ref([]);
 const statusFilter = ref("ทั้งหมด");
 const statusOptions = mockDb.get("inventoryStatuses");
+const selectedPurchaseProducts = computed(() =>
+  products.value.filter((item) => selectedPurchaseSkus.value.includes(item.sku)),
+);
 const filteredProducts = computed(() =>
   filteredItems.value.filter(
     (item) =>
@@ -126,6 +131,7 @@ async function loadProducts() {
   loadError.value = "";
   try {
     products.value = await inventoryApi.getProducts();
+    updateCategoryOptions();
   } catch (error) {
     loadError.value = error.message;
   } finally {
@@ -134,7 +140,15 @@ async function loadProducts() {
 }
 async function loadCategories() {
   const records = await inventoryApi.getCategories();
-  categories.value = ["ทั้งหมด", ...records.map((item) => item.name)];
+  registeredCategories.value = records.map((item) => item.name);
+  updateCategoryOptions();
+}
+function updateCategoryOptions() {
+  const names = [
+    ...registeredCategories.value,
+    ...products.value.map((item) => item.category),
+  ].filter(Boolean);
+  categories.value = ["ทั้งหมด", ...new Set(names)];
   if (!categories.value.includes(category.value)) category.value = "ทั้งหมด";
 }
 async function loadSuppliers() {
@@ -143,22 +157,27 @@ async function loadSuppliers() {
 function hydrateProductSuppliers(records) {
   return records.map((product) => ({
     ...product,
+    supplierId: product.supplier_ids?.[0] || "",
     supplier:
       (product.supplier_ids || [])
         .map((supplierId) =>
           suppliers.value.find((supplier) => supplier.id === supplierId)?.name,
         )
-        .find(Boolean) || "",
+        .filter(Boolean)
+        .join(", "),
   }));
 }
 onMounted(async () => {
   await Promise.all([loadProducts(), loadCategories(), loadSuppliers()]);
   products.value = hydrateProductSuppliers(products.value);
+  const supplierId = route.query.supplierId;
   const supplierName = route.query.supplier;
   const draft = readProductDraft();
-  const hasSupplierFromQuery =
-    typeof supplierName === "string" &&
-    suppliers.value.some((item) => item.name === supplierName);
+  const supplierFromQuery =
+    typeof supplierId === "string"
+      ? suppliers.value.find((item) => item.id === supplierId)
+      : suppliers.value.find((item) => item.name === supplierName);
+  const hasSupplierFromQuery = Boolean(supplierFromQuery);
 
   if (draft || hasSupplierFromQuery) {
     resetForm();
@@ -168,7 +187,7 @@ onMounted(async () => {
         (item) => item.sku === draft.editingSku,
       ) || null;
     }
-    if (hasSupplierFromQuery) form.value.supplier = supplierName;
+    if (hasSupplierFromQuery) form.value.supplierId = supplierFromQuery.id;
     showModal.value = true;
     clearProductDraft();
     if (hasSupplierFromQuery) router.replace({ path: "/inventory" });
@@ -216,7 +235,7 @@ function resetForm() {
     unit: "ชิ้น",
     price: 0,
     salePrice: 0,
-    supplier: "",
+    supplierId: "",
   };
   editingProduct.value = null;
 }
@@ -261,6 +280,7 @@ function openEdit(product) {
   form.value = {
     ...product,
     salePrice: product.salePrice ?? product.price ?? 0,
+    supplierId: product.supplierId || product.supplier_ids?.[0] || "",
   };
   editingProduct.value = product;
   showModal.value = true;
@@ -268,8 +288,12 @@ function openEdit(product) {
 async function saveProduct() {
   // บันทึกสินค้าใหม่หรือข้อมูลที่แก้ไขผ่าน API
   if (!form.value.sku || !form.value.name) return;
+  const productForm = { ...form.value };
+  const { supplierId } = productForm;
+  delete productForm.supplierId;
+  delete productForm.supplier;
   const payload = {
-    ...form.value,
+    ...productForm,
     stock: Number(form.value.stock),
     reorder_point: Number(form.value.reorderPoint),
     price: Number(form.value.price),
@@ -283,7 +307,7 @@ async function saveProduct() {
     else await inventoryApi.createProduct(payload);
 
     const selectedSupplier = suppliers.value.find(
-      (supplier) => supplier.name === form.value.supplier,
+      (supplier) => supplier.id === supplierId,
     );
     const savedSku = editingProduct.value?.sku || form.value.sku;
     for (const supplierId of previousSupplierIds) {
@@ -337,16 +361,10 @@ async function receiveStock() {
     loadError.value = error.message;
   }
 }
-// Existing reorder workflow: create the order with calculated quantities,
-// then open the existing supplier purchase-order section (no extra modal).
-function createPurchaseRequest(product) {
-  selectedReorderSkus.value = [product.sku];
-  void createPurchaseOrder([product]);
-}
 function toggleReorderSelection(sku) {
-  selectedReorderSkus.value = selectedReorderSkus.value.includes(sku)
-    ? selectedReorderSkus.value.filter((item) => item !== sku)
-    : [...selectedReorderSkus.value, sku];
+  selectedPurchaseSkus.value = selectedPurchaseSkus.value.includes(sku)
+    ? selectedPurchaseSkus.value.filter((item) => item !== sku)
+    : [...selectedPurchaseSkus.value, sku];
 }
 function openManualPurchasePicker() {
   manualPurchaseSearch.value = "";
@@ -358,19 +376,28 @@ function toggleManualPurchaseSelection(sku) {
     ? selectedManualPurchaseSkus.value.filter((item) => item !== sku)
     : [...selectedManualPurchaseSkus.value, sku];
 }
-async function addManualPurchaseItems() {
-  const selected = products.value.filter((item) =>
-    selectedManualPurchaseSkus.value.includes(item.sku),
+function addManualPurchaseItems() {
+  if (!selectedManualPurchaseSkus.value.length) return;
+  selectedPurchaseSkus.value = [
+    ...new Set([
+      ...selectedPurchaseSkus.value,
+      ...selectedManualPurchaseSkus.value,
+    ]),
+  ];
+  selectedManualPurchaseSkus.value = [];
+  showManualPurchaseModal.value = false;
+}
+function removePurchaseItem(sku) {
+  selectedPurchaseSkus.value = selectedPurchaseSkus.value.filter(
+    (item) => item !== sku,
   );
-  if (!selected.length) return;
-  await createPurchaseOrder(selected);
 }
 async function createPurchaseOrder(items = null) {
   if (isCreatingPurchaseOrder.value) return;
   // Do not pass a native click event as "items" (the old button did this).
   const selected = Array.isArray(items)
     ? items
-    : lowStock.value.filter((item) => selectedReorderSkus.value.includes(item.sku));
+    : selectedPurchaseProducts.value;
   if (!selected.length) {
     notify("กรุณาเลือกสินค้าที่ต้องการสั่งซื้อก่อน", "ยังไม่มีสินค้า");
     return;
@@ -399,7 +426,7 @@ async function createPurchaseOrder(items = null) {
   try {
     await operationsApi.create("purchaseOrders", order);
     showManualPurchaseModal.value = false;
-    selectedReorderSkus.value = [];
+    selectedPurchaseSkus.value = [];
     selectedManualPurchaseSkus.value = [];
     if (authEnabled.value && currentUser.value?.role === "employee") {
       // UC-03-06/07: Staff can create the request, but UC-02-07 (supplier
@@ -467,7 +494,7 @@ async function createPurchaseOrder(items = null) {
         <AppSearchField
           v-model="query"
           class-name="table-filter-search"
-          placeholder="ค้นหา SKU หรือชื่อสินค้า..."
+          placeholder="ค้นหา SKU ชื่อสินค้า หรือซัพพลายเออร์..."
           label="ค้นหาในตารางสินค้า"
         />
         <div class="category-picker status-picker">
@@ -660,16 +687,37 @@ async function createPurchaseOrder(items = null) {
           <button
             class="button primary"
             type="button"
-            :disabled="!selectedReorderSkus.length || isCreatingPurchaseOrder"
+            :disabled="!selectedPurchaseSkus.length || isCreatingPurchaseOrder"
             @click="createPurchaseOrder()"
           >
             <SvgIcon name="plus" />สร้างคำสั่งซื้อ<span
-              v-if="selectedReorderSkus.length"
+              v-if="selectedPurchaseSkus.length"
             >
-              ({{ selectedReorderSkus.length }})</span
+              ({{ selectedPurchaseSkus.length }})</span
             >
           </button>
         </div>
+      </div>
+      <div
+        v-if="selectedPurchaseProducts.length"
+        class="selected-purchase-summary"
+        role="status"
+        aria-live="polite"
+      >
+        <strong>รายการที่เลือกสำหรับสั่งซื้อ</strong>
+        <ul>
+          <li v-for="product in selectedPurchaseProducts" :key="product.sku">
+            <span>{{ product.name }} · {{ product.sku }}</span>
+            <button
+              type="button"
+              class="button secondary table-button"
+              :aria-label="'นำ ' + product.name + ' ออกจากรายการสั่งซื้อ'"
+              @click="removePurchaseItem(product.sku)"
+            >
+              นำออก
+            </button>
+          </li>
+        </ul>
       </div>
       <div class="table-scroll reorder-table-wrap">
         <table class="data-table reorder-table">
@@ -687,7 +735,7 @@ async function createPurchaseOrder(items = null) {
             <tr
               v-for="product in lowStock"
               :key="product.sku"
-              :class="{ selected: selectedReorderSkus.includes(product.sku) }"
+              :class="{ selected: selectedPurchaseSkus.includes(product.sku) }"
             >
               <td>
                 <strong>{{ product.name }}</strong
@@ -706,7 +754,7 @@ async function createPurchaseOrder(items = null) {
               <td class="reorder-select-cell">
                 <input
                   type="checkbox"
-                  :checked="selectedReorderSkus.includes(product.sku)"
+                  :checked="selectedPurchaseSkus.includes(product.sku)"
                   :aria-label="`เลือกรายการ ${product.name}`"
                   @change="toggleReorderSelection(product.sku)"
                 />
@@ -796,7 +844,7 @@ async function createPurchaseOrder(items = null) {
           class="button primary"
           :disabled="!selectedManualPurchaseSkus.length"
         >
-          <SvgIcon name="plus" />เพิ่มรายการ ({{
+          <SvgIcon name="plus" />เพิ่มลงรายการสั่งซื้อ ({{
             selectedManualPurchaseSkus.length
           }})
         </button>
@@ -977,11 +1025,11 @@ async function createPurchaseOrder(items = null) {
             >ซัพพลายเออร์
             <div class="category-select-row">
               <AppSelect
-                v-model="form.supplier"
+                v-model="form.supplierId"
                 :options="
                   suppliers.map((supplier) => ({
-                    value: supplier.name,
-                    label: supplier.name,
+                    value: supplier.id,
+                    label: supplier.name + ' · ' + supplier.id,
                   }))
                 "
                 placeholder="เลือกซัพพลายเออร์"
