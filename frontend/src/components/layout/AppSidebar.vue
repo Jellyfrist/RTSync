@@ -1,6 +1,8 @@
 <!-- เมนูด้านข้างสำหรับเปลี่ยนไปยังโมดูลต่าง ๆ -->
 <script setup>
 import { RouterLink } from "vue-router";
+import { computed } from "vue";
+import { authEnabled, currentUser } from "@/api/authSession";
 import SvgIcon from "../SvgIcon.vue";
 
 const props = defineProps({ collapsed: { type: Boolean, default: false } });
@@ -34,6 +36,20 @@ const groups = [
     items: [{ to: "/payroll", label: "ข้อมูลพนักงาน", icon: "briefcase" }],
   },
 ];
+// Only hide owner-only modules once Google RBAC has been activated.
+// Actual access is always checked on FastAPI, not by this menu.
+const visibleGroups = computed(() =>
+  groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        !authEnabled.value ||
+        currentUser.value?.role === "owner" ||
+        !["/suppliers", "/payroll"].includes(item.to),
+      ),
+    }))
+    .filter((group) => group.items.length > 0),
+);
 </script>
 
 <template>
@@ -53,7 +69,7 @@ const groups = [
       </button>
     </div>
     <div class="sidebar-scroll">
-      <div v-for="group in groups" :key="group.label" class="sidebar-group">
+      <div v-for="group in visibleGroups" :key="group.label" class="sidebar-group">
         <span class="section-label sidebar-group-label">{{ group.label }}</span>
         <nav class="sidebar-nav" :aria-label="group.label">
           <RouterLink
