@@ -105,9 +105,8 @@ onMounted(async () => {
     supplierId: item.supplier_ids?.[0] || supplierIds[item.supplier] || "",
     reorderPoint: item.reorderPoint,
   }));
-  purchaseOrders.value = purchaseOrderRecords?.length
-    ? purchaseOrderRecords
-    : mockDb.get("purchaseOrders");
+  // An empty response is real: never inject demo purchase orders into production.
+  purchaseOrders.value = purchaseOrderRecords ?? [];
 });
 function resetForm() {
   form.value = {
@@ -537,7 +536,7 @@ async function completePurchaseOrder(order) {
           label="รายการซัพพลายเออร์"
         />
       </section>
-      <section class="panel purchase-orders-panel">
+      <section id="purchase-orders" class="panel purchase-orders-panel">
         <div class="panel-toolbar purchase-orders-heading">
           <div>
             <h2 class="section-heading">รายการสั่งซื้อ</h2>
