@@ -14,6 +14,7 @@ import { inventoryApi } from "@/api/inventoryApi";
 import { operationsApi } from "@/api/operationsApi";
 import { mockDb } from "@/api/mockDb";
 import { authEnabled, currentUser } from "@/api/authSession";
+import { createSupplierCanonicalizer } from "@/utils/suppliers";
 const router = useRouter();
 const route = useRoute();
 const isInventorySupplierFlow = computed(
@@ -43,13 +44,32 @@ const form = ref({
 // รายการสินค้าจาก API คลังที่ใช้แสดงการผูกซัพพลายเออร์
 const products = ref([]);
 const purchaseOrders = ref([]);
-const showSupplierCategoryFilter = ref(false);
 const supplierCategoryFilter = ref("ทั้งหมด");
-const supplierCategoryFilterQuery = ref("");
 const purchaseOrderStatuses = mockDb.get("purchaseOrderStatuses");
 const showPurchaseHistory = ref(false);
+const supplierCanonicalizer = computed(() =>
+  createSupplierCanonicalizer(suppliers.value),
+);
+const canonicalSuppliers = computed(() =>
+  supplierCanonicalizer.value.suppliers.map((supplier) => {
+    const aliasIds = new Set(
+      supplierCanonicalizer.value.aliasesFor(supplier.id),
+    );
+    const linkedSkus = new Set(
+      products.value
+        .filter((product) =>
+          (product.supplier_ids || []).some((id) => aliasIds.has(id)),
+        )
+        .map((product) => product.sku),
+    );
+    return {
+      ...supplier,
+      sku: linkedSkus.size || Number(supplier.sku_count ?? supplier.sku ?? 0),
+    };
+  }),
+);
 const visibleSuppliers = computed(() =>
-  suppliers.value.filter(
+  canonicalSuppliers.value.filter(
     (item) =>
       `${item.name} ${item.category} ${item.contactName} ${item.contactPhone}`
         .toLowerCase()
@@ -67,14 +87,15 @@ const supplierCategoryOptions = computed(() => {
     ...new Map(options.map((category) => [category.name, category])).values(),
   ];
 });
-const filteredSupplierCategories = computed(() => {
-  const query = supplierCategoryFilterQuery.value.toLowerCase().trim();
-  return supplierCategoryOptions.value.filter((category) =>
-    category.name.toLowerCase().includes(query),
-  );
-});
+const supplierCategoryFilterOptions = computed(() => [
+  { value: "ทั้งหมด", label: "ทั้งหมด" },
+  ...supplierCategoryOptions.value.map((category) => ({
+    value: category.name,
+    label: category.name,
+  })),
+]);
 const selectedSupplier = computed(() =>
-  suppliers.value.find((item) => item.id === selectedId.value),
+  canonicalSuppliers.value.find((item) => item.id === selectedId.value),
 );
 const supplierProducts = computed(() =>
   products.value.filter((item) => item.supplierId === selectedId.value),
@@ -116,7 +137,9 @@ onMounted(async () => {
   };
   products.value = inventoryRecords.map((item) => ({
     ...item,
-    supplierId: item.supplier_ids?.[0] || supplierIds[item.supplier] || "",
+    supplierId: supplierCanonicalizer.value.idFor(
+      item.supplier_ids?.[0] || supplierIds[item.supplier] || "",
+    ),
     reorderPoint: item.reorderPoint,
   }));
   // An empty response is real: never inject demo purchase orders into production.
@@ -187,11 +210,11 @@ async function saveCategory() {
 async function saveSupplier() {
   // บันทึกซัพพลายเออร์ใหม่ลงฐานข้อมูล
   if (!form.value.name.trim() || !form.value.category.trim()) return;
-  if (editingSupplier.value) {
-    const supplier = await peopleApi.updateSupplier(editingSupplier.value.id, form.value);
-    Object.assign(editingSupplier.value, supplier);
-  } else {
-    try {
+  try {
+    if (editingSupplier.value) {
+      const supplier = await peopleApi.updateSupplier(editingSupplier.value.id, form.value);
+      Object.assign(editingSupplier.value, supplier);
+    } else {
       const supplier = await peopleApi.createSupplier(form.value);
       suppliers.value.push({ ...supplier, sku: supplier.sku_count });
       selectedId.value = supplier.id;
@@ -203,12 +226,11 @@ async function saveSupplier() {
         });
         return;
       }
-    } catch (error) {
-      window.alert(error.message);
-      return;
     }
+    close();
+  } catch (error) {
+    window.alert(error.message);
   }
-  close();
 }
 async function assignProduct() {
   // ผูกสินค้าที่เลือกเข้ากับซัพพลายเออร์ปัจจุบัน
@@ -217,17 +239,29 @@ async function assignProduct() {
   );
   if (!product) return;
   await peopleApi.linkProduct(selectedId.value, product.sku);
+  product.supplier_ids = [
+    ...new Set([...(product.supplier_ids || []), selectedId.value]),
+  ];
   product.supplierId = selectedId.value;
   productToAssign.value = "";
 }
 async function removeSupplierProduct(product) {
-  await peopleApi.unlinkProduct(selectedId.value, product.sku);
-  product.supplierId = "";
-}
-function selectSupplierCategory(category) {
-  supplierCategoryFilter.value = category;
-  supplierCategoryFilterQuery.value = "";
-  showSupplierCategoryFilter.value = false;
+  const supplierIds = (product.supplier_ids || []).filter(
+    (supplierId) =>
+      supplierCanonicalizer.value.idFor(supplierId) === selectedId.value,
+  );
+  const linksToRemove = supplierIds.length ? supplierIds : [selectedId.value];
+  await Promise.all(
+    linksToRemove.map((supplierId) =>
+      peopleApi.unlinkProduct(supplierId, product.sku),
+    ),
+  );
+  product.supplier_ids = (product.supplier_ids || []).filter(
+    (supplierId) => !linksToRemove.includes(supplierId),
+  );
+  product.supplierId = supplierCanonicalizer.value.idFor(
+    product.supplier_ids[0] || "",
+  );
 }
 function orderStatusClass(status) {
   if (["รับของเรียบร้อยแล้ว", "สำเร็จ"].includes(status)) return "success-tag";
@@ -309,60 +343,15 @@ async function completePurchaseOrder(order) {
             placeholder="ค้นหาซัพพลายเออร์"
             label="ค้นหาซัพพลายเออร์"
           />
-          <div class="category-picker supplier-category-filter">
-            <button
-              type="button"
-              class="category-picker-trigger control-field"
-              :aria-expanded="showSupplierCategoryFilter"
-              aria-controls="supplier-category-options"
-              @click="showSupplierCategoryFilter = !showSupplierCategoryFilter"
-            >
-              <span>หมวดหมู่</span><strong>{{ supplierCategoryFilter }}</strong
-              ><SvgIcon
-                class="supplier-category-chevron"
-                name="chevron-right"
-                size="16"
-              />
-            </button>
-            <div
-              v-if="showSupplierCategoryFilter"
-              id="supplier-category-options"
-              class="category-picker-menu"
-            >
-              <AppSearchField
-                v-model="supplierCategoryFilterQuery"
-                class-name="category-picker-search"
-                placeholder="ค้นหาหมวดหมู่"
-                label="ค้นหาหมวดหมู่ซัพพลายเออร์"
-              />
-              <div class="category-option-list">
-                <button
-                  type="button"
-                  :class="{ selected: supplierCategoryFilter === 'ทั้งหมด' }"
-                  @click="selectSupplierCategory('ทั้งหมด')"
-                >
-                  ทั้งหมด
-                </button>
-                <button
-                  v-for="category in filteredSupplierCategories"
-                  :key="category.category_id || category.name"
-                  type="button"
-                  :class="{
-                    selected: supplierCategoryFilter === category.name,
-                  }"
-                  @click="selectSupplierCategory(category.name)"
-                >
-                  {{ category.name }}
-                </button>
-                <p
-                  v-if="!filteredSupplierCategories.length"
-                  class="category-empty"
-                >
-                  ไม่พบหมวดหมู่ที่ค้นหา
-                </p>
-              </div>
-            </div>
-          </div>
+          <AppSelect
+            v-model="supplierCategoryFilter"
+            class="category-picker supplier-category-filter"
+            :options="supplierCategoryFilterOptions"
+            label="หมวดหมู่"
+            search-placeholder="ค้นหาหมวดหมู่"
+            aria-label="กรองตามหมวดหมู่ซัพพลายเออร์"
+            button-class="category-picker-trigger control-field"
+          />
         </div>
         <div class="table-scroll employee-directory-table-wrap">
           <table

@@ -6,6 +6,7 @@ const props = defineProps({
   modelValue: { type: [String, Number], default: "" },
   options: { type: Array, default: () => [] },
   placeholder: { type: String, default: "เลือกข้อมูล" },
+  label: { type: String, default: "" },
   searchPlaceholder: { type: String, default: "ค้นหา..." },
   ariaLabel: { type: String, default: "เลือกข้อมูล" },
   disabled: { type: Boolean, default: false },
@@ -65,6 +66,13 @@ function closeOnOutside(event) {
   }
   closeMenu();
 }
+function closeOnEscape(event) {
+  if (!open.value || event.key !== "Escape") return;
+  event.preventDefault();
+  event.stopPropagation();
+  closeMenu();
+  root.value?.querySelector(".app-select-trigger")?.focus();
+}
 function updateMenuPosition() {
   if (!open.value || !root.value) return;
 
@@ -72,26 +80,32 @@ function updateMenuPosition() {
   if (!trigger) return;
 
   const rect = trigger.getBoundingClientRect();
-  const viewportWidth = document.documentElement.clientWidth;
-  const viewportHeight = window.innerHeight;
+  const viewport = window.visualViewport;
+  const viewportWidth = viewport?.width || document.documentElement.clientWidth;
+  const viewportHeight = viewport?.height || window.innerHeight;
+  const viewportLeft = viewport?.offsetLeft || 0;
+  const viewportTop = viewport?.offsetTop || 0;
   const edge = 8;
   const gap = 8;
-  const below = Math.max(0, viewportHeight - rect.bottom - gap - edge);
-  const above = Math.max(0, rect.top - gap - edge);
+  const below = Math.max(
+    0,
+    viewportTop + viewportHeight - rect.bottom - gap - edge,
+  );
+  const above = Math.max(0, rect.top - viewportTop - gap - edge);
   const openAbove = below < 220 && above > below;
   const availableHeight = openAbove ? above : below;
   const width = Math.min(rect.width, Math.max(0, viewportWidth - edge * 2));
   const left = Math.min(
-    Math.max(edge, rect.left),
-    Math.max(edge, viewportWidth - edge - width),
+    Math.max(viewportLeft + edge, rect.left),
+    Math.max(viewportLeft + edge, viewportLeft + viewportWidth - edge - width),
   );
 
   menuStyle.value = {
     left: `${left}px`,
     width: `${width}px`,
-    maxHeight: `${Math.max(80, Math.min(320, availableHeight))}px`,
+    maxHeight: `${Math.max(64, Math.min(320, availableHeight))}px`,
     ...(openAbove
-      ? { bottom: `${viewportHeight - rect.top + gap}px` }
+      ? { bottom: `${window.innerHeight - rect.top + gap}px` }
       : { top: `${rect.bottom + gap}px` }),
   };
 }
@@ -111,9 +125,13 @@ function stopTrackingMenuPosition() {
   window.visualViewport?.removeEventListener("resize", updateMenuPosition);
   window.visualViewport?.removeEventListener("scroll", updateMenuPosition);
 }
-onMounted(() => document.addEventListener("click", closeOnOutside));
+onMounted(() => {
+  document.addEventListener("click", closeOnOutside);
+  document.addEventListener("keydown", closeOnEscape);
+});
 onBeforeUnmount(() => {
   document.removeEventListener("click", closeOnOutside);
+  document.removeEventListener("keydown", closeOnEscape);
   stopTrackingMenuPosition();
 });
 </script>
@@ -133,9 +151,11 @@ onBeforeUnmount(() => {
       :disabled="disabled"
       @click.stop="toggle"
     >
-      <span :class="{ placeholder: !selectedOption }">{{
-        selectedOption?.label || placeholder
-      }}</span>
+      <span v-if="label" class="app-select-prefix">{{ label }}</span>
+      <span
+        class="app-select-value"
+        :class="{ placeholder: !selectedOption }"
+      >{{ selectedOption?.label || placeholder }}</span>
       <SvgIcon name="chevron-right" size="16" />
     </button>
     <Teleport to="body">

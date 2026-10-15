@@ -1,6 +1,7 @@
 // ไฟล์นี้รวม API ของลูกค้า ซัพพลายเออร์ และพนักงาน
 import { isMockEnabled, request } from "./httpClient";
 import { mockDb } from "./mockDb";
+import { normalizeSupplierName } from "@/utils/suppliers";
 
 // ข้อมูลตัวอย่างสำหรับ preview UI กรณีเปิดเฉพาะ frontend โดยยังไม่ได้รัน API
 const normalizeEmployee = (employee) => ({
@@ -109,6 +110,16 @@ export const peopleApi = {
       );
     } catch (error) {
       if (!isMockEnabled()) throw error;
+      const duplicate = mockDb
+        .get("suppliers")
+        .find(
+          (item) =>
+            normalizeSupplierName(item.name) ===
+            normalizeSupplierName(supplier.name),
+        );
+      if (duplicate) {
+        throw new Error(`มีซัพพลายเออร์ชื่อนี้แล้ว: ${duplicate.name} (${duplicate.id})`);
+      }
       const record = normalizeSupplier({
         ...supplier,
         id: `SUP-TH-${String(mockDb.get("suppliers").length + 1).padStart(3, "0")}`,

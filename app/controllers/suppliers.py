@@ -11,6 +11,7 @@ from app.infrastructure.orm import ProductRecord, SupplierProductRecord
 from app.schemas.product import Product
 from uuid import uuid4
 from app.services.directory_service import DirectoryService
+from app.services.supplier_names import find_supplier_name_conflict
 
 router = APIRouter(prefix="/suppliers", tags=["suppliers"])
 
@@ -24,6 +25,12 @@ def get_suppliers(
 
 @router.post("", status_code=201, response_model=Supplier)
 def create_supplier(payload: CreateSupplierInput, session: SessionDependency):
+    duplicate = find_supplier_name_conflict(session, payload.name)
+    if duplicate is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"มีซัพพลายเออร์ชื่อนี้แล้ว: {duplicate.name} ({duplicate.id})",
+        )
     record = SupplierRecord(id=str(uuid4()), sku_count=0, **payload.model_dump())
     session.add(record)
     session.commit()

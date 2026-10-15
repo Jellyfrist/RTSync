@@ -21,6 +21,10 @@ from app.schemas.customer import Customer, CustomerInput
 from app.schemas.employee import Employee, EmployeeInput
 from app.schemas.product import CreateProductInput, Product, UpdateProductInput
 from app.schemas.supplier import CreateSupplierInput, Supplier
+from app.services.supplier_names import (
+    find_supplier_name_conflict,
+    normalize_supplier_name,
+)
 
 router = APIRouter(tags=["data-management"])
 
@@ -164,6 +168,17 @@ def update_supplier(supplier_id: str, payload: CreateSupplierInput, session: Ses
     row = session.get(SupplierRecord, supplier_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Supplier was not found.")
+    if normalize_supplier_name(payload.name) != normalize_supplier_name(row.name):
+        duplicate = find_supplier_name_conflict(
+            session,
+            payload.name,
+            exclude_id=supplier_id,
+        )
+        if duplicate is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"มีซัพพลายเออร์ชื่อนี้แล้ว: {duplicate.name} ({duplicate.id})",
+            )
     for key, value in payload.model_dump().items():
         setattr(row, key, value)
     session.commit()

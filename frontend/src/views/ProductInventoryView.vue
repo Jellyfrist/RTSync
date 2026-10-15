@@ -16,13 +16,14 @@ import { operationsApi } from "@/api/operationsApi";
 import { mockDb } from "@/api/mockDb";
 import { authEnabled, currentUser } from "@/api/authSession";
 import { getWeightedAverageCost, pricingDecision } from "@/api/pricingPolicy";
+import {
+  createSupplierCanonicalizer,
+  normalizeSupplierName,
+} from "@/utils/suppliers";
 
 const router = useRouter();
 const route = useRoute();
 const category = ref("ทั้งหมด");
-const categoryFilterQuery = ref("");
-const showCategoryPicker = ref(false);
-const showStatusPicker = ref(false);
 const showModal = ref(false);
 const showCategoryModal = ref(false);
 const showReceiveModal = ref(false);
@@ -66,6 +67,18 @@ const categories = ref(["ทั้งหมด"]);
 const registeredCategories = ref([]);
 const statusFilter = ref("ทั้งหมด");
 const statusOptions = mockDb.get("inventoryStatuses");
+const supplierCanonicalizer = computed(() =>
+  createSupplierCanonicalizer(suppliers.value),
+);
+const canonicalSuppliers = computed(
+  () => supplierCanonicalizer.value.suppliers,
+);
+const supplierSelectOptions = computed(() =>
+  canonicalSuppliers.value.map((supplier) => ({
+    value: supplier.id,
+    label: supplier.name,
+  })),
+);
 const selectedPurchaseProducts = computed(() =>
   products.value.filter((item) => selectedPurchaseSkus.value.includes(item.sku)),
 );
@@ -74,11 +87,6 @@ const filteredProducts = computed(() =>
     (item) =>
       (category.value === "ทั้งหมด" || item.category === category.value) &&
       (statusFilter.value === "ทั้งหมด" || item.status === statusFilter.value),
-  ),
-);
-const filteredCategoryOptions = computed(() =>
-  categories.value.filter((item) =>
-    item.toLowerCase().includes(categoryFilterQuery.value.trim().toLowerCase()),
   ),
 );
 const lowStock = computed(() =>
@@ -157,15 +165,29 @@ async function loadSuppliers() {
 function hydrateProductSuppliers(records) {
   return records.map((product) => ({
     ...product,
-    supplierId: product.supplier_ids?.[0] || "",
+    supplierId: supplierCanonicalizer.value.idFor(
+      product.supplier_ids?.[0] || "",
+    ),
     supplier:
-      (product.supplier_ids || [])
+      [...new Set(product.supplier_ids || [])]
         .map((supplierId) =>
           suppliers.value.find((supplier) => supplier.id === supplierId)?.name,
         )
         .filter(Boolean)
+        .filter(
+          (name, index, names) =>
+            names.findIndex(
+              (candidate) =>
+                normalizeSupplierName(candidate) ===
+                normalizeSupplierName(name),
+            ) === index,
+        )
         .join(", "),
   }));
+}
+async function refreshProducts() {
+  await loadProducts();
+  products.value = hydrateProductSuppliers(products.value);
 }
 onMounted(async () => {
   await Promise.all([loadProducts(), loadCategories(), loadSuppliers()]);
@@ -175,13 +197,25 @@ onMounted(async () => {
   const draft = readProductDraft();
   const supplierFromQuery =
     typeof supplierId === "string"
-      ? suppliers.value.find((item) => item.id === supplierId)
-      : suppliers.value.find((item) => item.name === supplierName);
+      ? suppliers.value.find(
+          (item) =>
+            item.id === supplierCanonicalizer.value.idFor(supplierId),
+        )
+      : canonicalSuppliers.value.find(
+          (item) =>
+            normalizeSupplierName(item.name) ===
+            normalizeSupplierName(supplierName),
+        );
   const hasSupplierFromQuery = Boolean(supplierFromQuery);
 
   if (draft || hasSupplierFromQuery) {
     resetForm();
-    if (draft?.form) form.value = { ...form.value, ...draft.form };
+    if (draft?.form) {
+      form.value = { ...form.value, ...draft.form };
+      form.value.supplierId = supplierCanonicalizer.value.idFor(
+        form.value.supplierId,
+      );
+    }
     if (draft?.editingSku) {
       editingProduct.value = products.value.find(
         (item) => item.sku === draft.editingSku,
@@ -244,15 +278,6 @@ function openAdd() {
   resetForm();
   showModal.value = true;
 }
-function selectCategory(nextCategory) {
-  category.value = nextCategory;
-  categoryFilterQuery.value = "";
-  showCategoryPicker.value = false;
-}
-function selectStatus(nextStatus) {
-  statusFilter.value = nextStatus;
-  showStatusPicker.value = false;
-}
 function openCategoryModal() {
   newCategoryName.value = "";
   showCategoryModal.value = true;
@@ -280,7 +305,9 @@ function openEdit(product) {
   form.value = {
     ...product,
     salePrice: product.salePrice ?? product.price ?? 0,
-    supplierId: product.supplierId || product.supplier_ids?.[0] || "",
+    supplierId: supplierCanonicalizer.value.idFor(
+      product.supplierId || product.supplier_ids?.[0] || "",
+    ),
   };
   editingProduct.value = product;
   showModal.value = true;
@@ -321,8 +348,7 @@ async function saveProduct() {
     ) {
       await peopleApi.linkProduct(selectedSupplier.id, savedSku);
     }
-    await loadProducts();
-    products.value = hydrateProductSuppliers(products.value);
+    await refreshProducts();
     showModal.value = false;
     clearProductDraft();
     notify(
@@ -351,7 +377,7 @@ async function receiveStock() {
   if (!product || !Number.isFinite(amount) || amount <= 0) return;
   try {
     await inventoryApi.receiveStock(product.sku, amount, receiveUnitCost.value);
-    await loadProducts();
+    await refreshProducts();
     showReceiveModal.value = false;
     notify(
       `เพิ่ม ${amount.toLocaleString("th-TH")} ${product.unit} ให้ ${product.sku} แล้ว`,
@@ -497,76 +523,24 @@ async function createPurchaseOrder(items = null) {
           placeholder="ค้นหา SKU ชื่อสินค้า หรือซัพพลายเออร์..."
           label="ค้นหาในตารางสินค้า"
         />
-        <div class="category-picker status-picker">
-          <button
-            type="button"
-            class="category-picker-trigger control-field"
-            :aria-expanded="showStatusPicker"
-            aria-controls="inventory-status-options"
-            @click="showStatusPicker = !showStatusPicker"
-          >
-            <span>สถานะ</span><strong>{{ statusFilter }}</strong
-            ><SvgIcon
-              class="status-picker-chevron"
-              name="chevron-right"
-              size="16"
-            />
-          </button>
-          <div
-            v-if="showStatusPicker"
-            id="inventory-status-options"
-            class="category-picker-menu"
-          >
-            <div class="category-option-list">
-              <button
-                v-for="status in statusOptions"
-                :key="status"
-                type="button"
-                :class="{ selected: statusFilter === status }"
-                @click="selectStatus(status)"
-              >
-                {{ status }}
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="category-picker">
-          <button
-            type="button"
-            class="category-picker-trigger control-field"
-            :aria-expanded="showCategoryPicker"
-            aria-controls="inventory-category-options"
-            @click="showCategoryPicker = !showCategoryPicker"
-          >
-            <span>หมวดหมู่</span><strong>{{ category }}</strong>
-          </button>
-          <div
-            v-if="showCategoryPicker"
-            id="inventory-category-options"
-            class="category-picker-menu"
-          >
-            <AppSearchField
-              v-model="categoryFilterQuery"
-              class-name="category-picker-search"
-              placeholder="ค้นหาหมวดหมู่"
-              label="ค้นหาหมวดหมู่"
-            />
-            <div class="category-option-list">
-              <button
-                v-for="item in filteredCategoryOptions"
-                :key="item"
-                type="button"
-                :class="{ selected: category === item }"
-                @click="selectCategory(item)"
-              >
-                {{ item }}
-              </button>
-              <p v-if="!filteredCategoryOptions.length" class="category-empty">
-                ไม่พบหมวดหมู่ที่ค้นหา
-              </p>
-            </div>
-          </div>
-        </div>
+        <AppSelect
+          v-model="statusFilter"
+          class="category-picker status-picker"
+          :options="statusOptions"
+          :searchable="false"
+          label="สถานะ"
+          aria-label="กรองตามสถานะสินค้า"
+          button-class="category-picker-trigger control-field"
+        />
+        <AppSelect
+          v-model="category"
+          class="category-picker"
+          :options="categories"
+          label="หมวดหมู่"
+          search-placeholder="ค้นหาหมวดหมู่"
+          aria-label="กรองตามหมวดหมู่สินค้า"
+          button-class="category-picker-trigger control-field"
+        />
       </div>
       <div class="table-scroll">
         <table class="data-table inventory-table">
@@ -1026,12 +1000,7 @@ async function createPurchaseOrder(items = null) {
             <div class="category-select-row">
               <AppSelect
                 v-model="form.supplierId"
-                :options="
-                  suppliers.map((supplier) => ({
-                    value: supplier.id,
-                    label: supplier.name + ' · ' + supplier.id,
-                  }))
-                "
+                :options="supplierSelectOptions"
                 placeholder="เลือกซัพพลายเออร์"
                 aria-label="เลือกซัพพลายเออร์"
                 required

@@ -13,10 +13,11 @@ This repository runs **Vue 3 + Vite** and **FastAPI** in **one Vercel project**,
 
 The root `vercel.json` defines two independently built services and orders
 the public rewrites so that FastAPI's `/api/*` paths take priority over the
-Vue catch-all. The Vite service at `frontend/` uses its existing SPA fallback
-configuration for Vue Router. The Python service at repository root imports
-`app.main:app` via `index.py`. The existing root `requirements.txt` and
-`.python-version` enable Python deployment.
+Vue catch-all. The catch-all forwards the original path to the frontend
+service, where `frontend/vercel.json` rewrites Vue Router deep links to the
+SPA entry point. The Python service at repository root imports `app.main:app`
+via `index.py`. The existing root `requirements.txt` and `.python-version`
+enable Python deployment.
 
 The frontend's API client defaults to **relative `/api`**, not an absolute
 backend hostname. Requests stay same-origin, so cross-domain CORS is no longer
