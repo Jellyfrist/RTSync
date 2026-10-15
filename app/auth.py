@@ -14,7 +14,19 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.config import settings
-from app.authorization import role_for_email
+
+
+def role_for_email(email: str, *, owner_emails: str, employee_emails: str) -> str | None:
+    """Identify one of the two actors without adding page/use-case restrictions."""
+    value = (email or "").strip().casefold()
+    owners = {item.strip().casefold() for item in owner_emails.split(",") if item.strip()}
+    employees = {item.strip().casefold() for item in employee_emails.split(",") if item.strip()}
+    if value and value in owners:
+        return "owner"
+    if value and value in employees:
+        return "employee"
+    return None
+
 
 router = APIRouter(prefix="/auth", tags=["authentication"], include_in_schema=False)
 
