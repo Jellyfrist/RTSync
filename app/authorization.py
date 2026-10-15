@@ -77,6 +77,10 @@ def can_access_api(role: str, method: str, path: str, prefix: str = "/api") -> b
         return method == "POST"
 
     # Staff can select existing suppliers inside the inventory form.
+    if resource == "/suppliers/categories":
+        # The UC-03-08 supplier-creation form uses existing category options.
+        # Creating/editing supplier categories remains owner-only (UC-02-04).
+        return method == "GET"
     if resource == "/suppliers":
         # UC-03-08: registration from inventory uses the existing POST /suppliers.
         # The /suppliers management screen itself stays owner-only.
