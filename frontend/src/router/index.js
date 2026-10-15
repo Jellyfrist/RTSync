@@ -11,7 +11,7 @@ const SupplierManagementView = () =>
 const FuelClaimsView = () => import("@/views/FuelClaimsView.vue");
 
 const routes = [
-  { path: "/", redirect: "/customers" },
+  { path: "/", name: "home-login", component: LoginView },
   { path: "/login", name: "login", component: LoginView },
   { path: "/customers", name: "customers", component: CustomerView },
   { path: "/inventory", name: "inventory", component: ProductInventoryView },
@@ -51,18 +51,18 @@ const router = createRouter({
 
 
 // Role gating applies to existing screens only; this adds no business Use Case.
-// Business APIs independently validate the verified Google session + role.
+// Business APIs independently validate the verified account session + role.
 router.beforeEach(async (to) => {
   const enabled = await loadAuthStatus();
-  if (!enabled) return to.path === "/login" ? "/customers" : true;
+  if (!enabled) return to.path === "/login" ? "/" : true;
 
-  if (to.path === "/login") {
+  if (to.path === "/" || to.path === "/login") {
     const user = await loadCurrentUser();
     return user ? "/customers" : true;
   }
 
   const user = await loadCurrentUser();
-  if (!user) return { path: "/login", query: { returnTo: to.fullPath } };
+  if (!user) return { path: "/", query: { returnTo: to.fullPath } };
 
   if (user.role === "employee" && ["/payroll", "/suppliers"].includes(to.path)) {
     // UC-03-08: from the inventory form Staff may use supplier registration
