@@ -1,18 +1,40 @@
 <script setup>
-import { computed } from "vue";
-import { useRoute } from "vue-router";
+import { computed, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { loadCurrentUser } from "@/api/authSession";
 
+const router = useRouter();
 const route = useRoute();
-const errorMessage = computed(() => {
-  const messages = {
-    oauth: "Google Login ไม่สำเร็จ กรุณาลองอีกครั้ง",
-    not_approved: "บัญชีนี้ยังไม่ได้รับอนุญาตให้ใช้งาน RTSync",
-  };
-  return messages[route.query.error] || (route.query.error ? "ไม่สามารถเข้าสู่ระบบได้ กรุณาลองใหม่" : "");
-});
-function login() {
-  // Google OAuth starts on FastAPI. No API key or access token is in frontend JS.
-  window.location.assign("/api/auth/google");
+const username = ref("");
+const password = ref("");
+const busy = ref(false);
+const error = ref("");
+const errorMessage = computed(() => error.value || (route.query.error ? "กรุณาเข้าสู่ระบบใหม่" : ""));
+async function login() {
+  if (busy.value) return;
+  busy.value = true;
+  error.value = "";
+  try {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: username.value, password: password.value }),
+    });
+    if (!response.ok) {
+      const message = await response.json().catch(() => ({}));
+      throw new Error(typeof message.detail === "string" ? message.detail : "เข้าสู่ระบบไม่สำเร็จ");
+    }
+    await loadCurrentUser();
+    const dest = typeof route.query.returnTo === "string" &&
+      route.query.returnTo.startsWith("/") && !route.query.returnTo.startsWith("//")
+      ? route.query.returnTo : "/customers";
+    await router.replace(dest);
+  } catch (e) {
+    error.value = e.message || "ไม่สามารถเข้าสู่ระบบได้";
+  } finally {
+    busy.value = false;
+  }
 }
 </script>
 
@@ -23,12 +45,18 @@ function login() {
       <h1>RTSync</h1>
       <p class="subtitle">ระบบจัดการธุรกิจ RTSat</p>
       <h2>เข้าสู่ระบบ</h2>
-      <p>ใช้บัญชี Google ที่ได้รับอนุญาต เพื่อเข้าถึงระบบจัดการงานเดิมของ RTSync</p>
-      <p v-if="errorMessage" class="login-error" role="alert">{{ errorMessage }}</p>
-      <button type="button" class="login-button" @click="login">
-        <span class="google-g">G</span> ดำเนินการต่อด้วย Google
-      </button>
-      <small>หากไม่มีสิทธิ์เข้าใช้งาน กรุณาติดต่อผู้ดูแลระบบ</small>
+      <p>เข้าสู่ระบบด้วยบัญชีที่ได้รับอนุญาตจาก RTSync</p>
+      <form @submit.prevent="login">
+        <label class="field-label" for="username">ชื่อผู้ใช้</label>
+        <input id="username" v-model.trim="username" name="username" autocomplete="username" required />
+        <label class="field-label" for="password">รหัสผ่าน</label>
+        <input id="password" v-model="password" type="password" name="password" autocomplete="current-password" required />
+        <p v-if="errorMessage" class="login-error" role="alert">{{ errorMessage }}</p>
+        <button type="submit" class="login-button" :disabled="busy">
+          {{ busy ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ" }}
+        </button>
+      </form>
+      <small>สำหรับเจ้าของร้านและพนักงานที่ได้รับอนุญาต</small>
     </section>
   </main>
 </template>
@@ -89,4 +117,10 @@ p { line-height: 1.65; }
 }
 .login-button:hover { background: #f2f6ff; }
 .google-g { color: #4285f4; font-size: 22px; font-weight: 800; margin-right: 10px; }
+</style>
+
+<style scoped>
+.field-label { display:block; text-align:left; font-weight:600; margin:14px 0 6px; }
+input { box-sizing:border-box; display:block; width:100%; padding:12px; border:1px solid #a7b8cc; border-radius:8px; font:inherit; }
+.login-button:disabled { opacity:.6; cursor:wait; }
 </style>
