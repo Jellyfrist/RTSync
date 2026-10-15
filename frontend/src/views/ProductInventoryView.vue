@@ -14,6 +14,7 @@ import { inventoryApi } from "@/api/inventoryApi";
 import { peopleApi } from "@/api/peopleApi";
 import { operationsApi } from "@/api/operationsApi";
 import { mockDb } from "@/api/mockDb";
+import { authEnabled, currentUser } from "@/api/authSession";
 import { getWeightedAverageCost, pricingDecision } from "@/api/pricingPolicy";
 
 const router = useRouter();
@@ -400,7 +401,13 @@ async function createPurchaseOrder(items = null) {
     showManualPurchaseModal.value = false;
     selectedReorderSkus.value = [];
     selectedManualPurchaseSkus.value = [];
-    await router.push({ path: "/suppliers", hash: "#purchase-orders" });
+    if (authEnabled.value && currentUser.value?.role === "employee") {
+      // UC-03-06/07: Staff can create the request, but UC-02-07 (supplier
+      // purchase-order status management) remains Store-owner-only.
+      notify("ส่งรายการสั่งซื้อให้เจ้าของร้านดำเนินการต่อแล้ว", "สร้างคำสั่งซื้อสำเร็จ");
+    } else {
+      await router.push({ path: "/suppliers", hash: "#purchase-orders" });
+    }
   } catch (error) {
     notify(error.message || "กรุณาลองใหม่", "สร้างคำสั่งซื้อไม่สำเร็จ");
   } finally {
