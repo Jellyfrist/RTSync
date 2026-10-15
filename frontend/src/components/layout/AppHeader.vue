@@ -19,7 +19,7 @@ async function signOut() {
   userMenuOpen.value = false;
   if (authEnabled.value) {
     await logout();
-    await router.replace("/login");
+    await router.replace("/");
   }
 }
 </script>
