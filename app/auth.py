@@ -14,18 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.config import settings
-
-
-def role_for_email(email: str, *, owner_emails: str, employee_emails: str) -> str | None:
-    """Identify one of the two actors without adding page/use-case restrictions."""
-    value = (email or "").strip().casefold()
-    owners = {item.strip().casefold() for item in owner_emails.split(",") if item.strip()}
-    employees = {item.strip().casefold() for item in employee_emails.split(",") if item.strip()}
-    if value and value in owners:
-        return "owner"
-    if value and value in employees:
-        return "employee"
-    return None
+from app.authorization import role_for_email
 
 
 router = APIRouter(prefix="/auth", tags=["authentication"], include_in_schema=False)
@@ -105,12 +94,14 @@ async def login_google():
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     state = secrets.token_urlsafe(24)
     redirect_to = settings.frontend_origin.rstrip("/") + settings.api_prefix + "/auth/callback"
+    # Bind our CSRF state to redirect_to: Supabase may not forward an arbitrary
+    # state parameter supplied to its /authorize Google-provider endpoint.
+    redirect_to += "?" + urlencode({"state": state})
     authorization_url = f"{_auth_base()}/authorize?" + urlencode({
         "provider": "google",
         "redirect_to": redirect_to,
         "code_challenge": challenge,
         "code_challenge_method": "s256",
-        "state": state,
     })
     response = RedirectResponse(authorization_url, status_code=303)
     for key, value in [(VERIFIER_COOKIE, verifier), (STATE_COOKIE, state)]:
@@ -148,6 +139,16 @@ async def google_callback(request: Request, code: str | None = None, state: str 
     for key in (VERIFIER_COOKIE, STATE_COOKIE):
         response.delete_cookie(key, path=settings.api_prefix + "/auth")
     return response
+
+
+@router.get("/status")
+async def status():
+    # Only disclose whether app authentication is active; never include
+    # allowed account email addresses or API credentials in this response.
+    return JSONResponse(
+        {"enabled": _enabled(), "roles": ["owner", "employee"]},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/me")
