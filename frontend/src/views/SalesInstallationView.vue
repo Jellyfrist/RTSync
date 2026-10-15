@@ -434,6 +434,8 @@ async function saveSale() {
   notify("บันทึกรายการขายแล้ว — พร้อมสร้างนัดหมายติดตั้ง");
 }
 async function saveQuotation() {
+  if (!quotationForm.value.customer)
+    return notify("กรุณาลงทะเบียนและเลือกลูกค้าก่อนออกใบเสนอราคา");
   if (!bill.value.length && !quoteServices.value.length)
     return notify("กรุณาเพิ่มสินค้า หรือค่าบริการอย่างน้อย 1 รายการ");
   if (lossMakingItems.value.length)
