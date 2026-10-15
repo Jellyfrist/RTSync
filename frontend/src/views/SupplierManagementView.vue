@@ -13,8 +13,13 @@ import { peopleApi } from "@/api/peopleApi";
 import { inventoryApi } from "@/api/inventoryApi";
 import { operationsApi } from "@/api/operationsApi";
 import { mockDb } from "@/api/mockDb";
+import { authEnabled, currentUser } from "@/api/authSession";
 const router = useRouter();
 const route = useRoute();
+const isInventorySupplierFlow = computed(
+  () => authEnabled.value && currentUser.value?.role === "employee" &&
+    route.query.from === "inventory",
+);
 // รายชื่อซัพพลายเออร์จาก API
 const suppliers = ref([]);
 const supplierCategories = ref([]);
@@ -215,7 +220,24 @@ async function completePurchaseOrder(order) {
       title="ศูนย์จัดการซัพพลายเออร์และสินค้า"
       description="Suppliers & Sourcing Hub"
     />
-    <div class="supplier-page">
+    <div v-if="isInventorySupplierFlow" class="supplier-page">
+      <section class="operations-table-section supplier-workspace">
+        <div class="task-table-heading">
+          <div>
+            <h2 class="section-heading">เพิ่มซัพพลายเออร์จากฟอร์มสินค้า</h2>
+            <p class="section-caption">
+              UC-03-08 · ใช้เฉพาะการลงทะเบียนคู่ค้า แล้วกลับไปกรอกสินค้า
+            </p>
+          </div>
+          <button type="button" class="button primary" @click="openAdd">
+            <SvgIcon name="plus" />เพิ่มซัพพลายเออร์
+          </button>
+        </div>
+        <button type="button" class="button secondary"
+          @click="router.push('/inventory')">กลับไปคลังสินค้า</button>
+      </section>
+    </div>
+    <div v-else class="supplier-page">
       <section class="operations-table-section supplier-workspace">
         <div class="task-table-heading">
           <div>
