@@ -17,19 +17,25 @@ import { mockDb } from "@/api/mockDb";
 const customers = ref([]);
 const customerTypes = ref(mockDb.get("customerTypes"));
 const salesHistory = ref([]);
+const quotationHistory = ref([]);
+const quotationLoadError = ref("");
 const installationHistory = ref([]);
 const serviceHistory = ref([]);
 const loading = ref(true);
 onMounted(async () => {
   // โหลดลูกค้าและสินค้าใบเสนอราคาพร้อมกันเมื่อเปิดหน้า
   try {
-    const [records, products, appointments, serviceTickets, sales] =
+    const [records, products, appointments, serviceTickets, sales, quotations] =
       await Promise.all([
         peopleApi.getCustomers(),
         inventoryApi.getProducts(),
         operationsApi.getAppointments(),
         operationsApi.getServiceTickets(),
         operationsApi.getSales(),
+        operationsApi.getQuotations().catch((error) => {
+          quotationLoadError.value = error.message || "ไม่สามารถโหลดใบเสนอราคาได้";
+          return [];
+        }),
       ]);
     customers.value = records.map((item) => ({
       ...item,
@@ -50,6 +56,7 @@ onMounted(async () => {
       unit: item.unit,
     }));
     salesHistory.value = sales;
+    quotationHistory.value = quotations;
     installationHistory.value = appointments;
     serviceHistory.value = serviceTickets;
   } finally {
@@ -92,6 +99,13 @@ const quoteTotal = computed(() =>
 const money = (value) => new Intl.NumberFormat("th-TH").format(value);
 const selectedCustomer = computed(() =>
   customers.value.find((customer) => customer.id === activeId.value),
+);
+const selectedCustomerQuotations = computed(() =>
+  quotationHistory.value.filter(
+    (quote) =>
+      (quote.customerCode && quote.customerCode === selectedCustomer.value?.code) ||
+      quote.customer === selectedCustomer.value?.name,
+  ),
 );
 const selectedCustomerSales = computed(() =>
   salesHistory.value.filter(
@@ -248,11 +262,32 @@ function addQuote(product) {
   if (item) item.qty += 1;
   else quoteItems.value.push({ ...product, qty: 1 });
 }
-function createQuote() {
+async function createQuote() {
   if (!quoteItems.value.length)
     return showNotice("กรุณาเพิ่มสินค้าในใบเสนอราคา");
-  customerPanel.value = "quote";
-  showNotice("บันทึกใบเสนอราคา QT-25062 เรียบร้อย");
+  if (!selectedCustomer.value)
+    return showNotice("กรุณาเลือกลูกค้าก่อนออกใบเสนอราคา");
+  const quote = {
+    id: `QT-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+    customer: selectedCustomer.value.name,
+    customerCode: selectedCustomer.value.code,
+    issuedAt: new Date().toISOString().slice(0, 10),
+    items: quoteItems.value.map(({ sku, name, qty, unit, price }) => ({
+      sku, name, qty, unit, price: Number(price) || 0,
+    })),
+    services: [],
+    total: quoteTotal.value,
+    status: "ร่างใบเสนอราคา",
+  };
+  try {
+    const saved = await operationsApi.create("quotations", quote);
+    quotationHistory.value.unshift(saved);
+    quoteItems.value = [];
+    customerPanel.value = "profile";
+    showNotice(`บันทึกใบเสนอราคา ${saved.id} สำเร็จ`);
+  } catch (error) {
+    showNotice(`ไม่สามารถบันทึกใบเสนอราคา: ${error.message}`);
+  }
 }
 function issueReceipt() {
   if (!quoteTotal.value) return showNotice("ยังไม่มียอดสำหรับออกใบเสร็จ");
@@ -574,6 +609,31 @@ function issueReceipt() {
                       :total="selectedCustomerServices.length"
                       label="บริการหลังการขาย"
                     />
+                    <h3 v-if="customerPanel === 'profile'">ประวัติใบเสนอราคา</h3>
+                    <p v-if="customerPanel === 'profile' && quotationLoadError" role="alert">
+                      {{ quotationLoadError }}
+                    </p>
+                    <table v-if="customerPanel === 'profile'" class="data-table">
+                      <thead>
+                        <tr><th>เลขที่ใบเสนอราคา</th><th>วันที่ออก</th><th>ยอดรวม</th><th>สถานะ</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="quote in selectedCustomerQuotations" :key="quote.id">
+                          <td><span class="sku-code">{{ quote.id }}</span></td>
+                          <td>{{ quote.issuedAt ? new Date(quote.issuedAt).toLocaleDateString("th-TH") : "—" }}</td>
+                          <td class="mono">฿{{ money(Number(quote.total) || 0) }}</td>
+                          <td>{{ quote.status || "—" }}</td>
+                        </tr>
+                        <tr v-if="!selectedCustomerQuotations.length">
+                          <td colspan="4" class="empty-state">ยังไม่มีใบเสนอราคาสำหรับลูกค้ารายนี้</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <TablePagination
+                      v-if="customerPanel === 'profile'"
+                      :total="selectedCustomerQuotations.length"
+                      label="ประวัติใบเสนอราคา"
+                    />
                     <h3 v-if="customerPanel === 'profile'">
                       ประวัติการสั่งซื้อ
                     </h3>
@@ -647,7 +707,7 @@ function issueReceipt() {
                             {{ selectedCustomer.name }}
                           </p>
                         </div>
-                        <span class="code-tag">QT-25062 · ร่าง</span>
+                        <span class="code-tag">ร่างใบเสนอราคา</span>
                       </div>
                       <div class="quote-product-grid">
                         <button
