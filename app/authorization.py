@@ -34,12 +34,12 @@ def is_allowed(role: str, method: str, path: str, api_prefix: str = "/api") -> b
     resource = unquote(path[len(prefix):]).rstrip("/")
     method = method.upper()
 
-    if resource in ("/customers", "/inventory/products", "/inventory/categories", "/inventory/summary", "/catalog/products", "/catalog/summary", "/suppliers"):
+    if resource in ("/inventory/products", "/inventory/categories", "/inventory/summary", "/catalog/products", "/catalog/summary", "/suppliers"):
         return method == "GET"
 
     # In-store customer operations, but never supplier edits or payroll APIs.
-    if resource == "/customers" and method == "POST":
-        return True
+    if resource == "/customers":
+        return method in {"GET", "POST"}
     if resource.startswith("/customers/") and method == "PATCH":
         return True
     if resource == "/inventory/products" and method == "POST":
