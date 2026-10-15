@@ -33,24 +33,28 @@ def create_app(config: Settings | None = None) -> FastAPI:
 
     if config.rtsync_auth_required:
         @application.middleware("http")
-        async def enforce_google_auth(request: Request, call_next):
-            """Check Google session + chapter-10 role before running business APIs."""
+        async def enforce_account_auth(request: Request, call_next):
+            """Check signed account session + chapter-10 role before running business APIs."""
             path = request.url.path
             prefix = config.api_prefix.rstrip("/")
             public_gets = {
                 f"{prefix}/health",
                 f"{prefix}/auth/status",
-                f"{prefix}/auth/google",
-                f"{prefix}/auth/callback",
                 f"{prefix}/auth/me",
             }
             if request.method == "OPTIONS":
                 return await call_next(request)
             if request.method == "GET" and path in public_gets:
                 return await call_next(request)
-            if request.method == "POST" and path == f"{prefix}/auth/logout":
+            if request.method == "POST" and path in {f"{prefix}/auth/login", f"{prefix}/auth/logout"}:
                 return await call_next(request)
 
+            # A browser can send SameSite cookies but business mutations must
+            # additionally come from the app's own origin to resist CSRF.
+            if request.method not in {"GET", "HEAD", "OPTIONS"}:
+                origin = request.headers.get("origin", "")
+                if origin and origin.rstrip("/") not in allowed_origins:
+                    return JSONResponse({"detail": "Untrusted request origin"}, status_code=403)
             try:
                 user = await authorized_user(request.cookies.get(SESSION_COOKIE))
             except HTTPException as exc:
