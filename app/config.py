@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     frontend_origin: str = "http://127.0.0.1:5173"
     database_url: str = ""
+    # Opt-in Google login; Vercel Authentication stays enabled until activated.
+    rtsync_auth_required: bool = False
+    rtsync_allowed_emails: str = ""
+    supabase_auth_url: str = "https://zbgomqxlqmcucekjccmt.supabase.co"
+    # Server-only publishable API key. Never prefix with VITE_: public REST grants are not hardened.
+    supabase_auth_key: str = ""
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parent.parent / ".env",
