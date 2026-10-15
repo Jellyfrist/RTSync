@@ -729,6 +729,7 @@ async function completePurchaseOrder(order) {
               >
                 <template #menu-footer="{ close }">
                   <button
+                    v-if="!isInventorySupplierFlow"
                     type="button"
                     class="app-select-add-action"
                     @click.stop="
