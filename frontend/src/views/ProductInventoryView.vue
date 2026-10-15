@@ -31,8 +31,7 @@ const receiveAmount = ref(10);
 const receiveUnitCost = ref(0);
 const toast = ref(null);
 const selectedReorderSkus = ref([]);
-const showPurchaseOrderModal = ref(false);
-const purchaseOrderItems = ref([]);
+const isCreatingPurchaseOrder = ref(false);
 const showManualPurchaseModal = ref(false);
 const manualPurchaseSearch = ref("");
 const selectedManualPurchaseSkus = ref([]);
@@ -337,34 +336,16 @@ async function receiveStock() {
     loadError.value = error.message;
   }
 }
+// Existing reorder workflow: create the order with calculated quantities,
+// then open the existing supplier purchase-order section (no extra modal).
 function createPurchaseRequest(product) {
   selectedReorderSkus.value = [product.sku];
-  openPurchaseOrder();
+  void createPurchaseOrder([product]);
 }
 function toggleReorderSelection(sku) {
   selectedReorderSkus.value = selectedReorderSkus.value.includes(sku)
     ? selectedReorderSkus.value.filter((item) => item !== sku)
     : [...selectedReorderSkus.value, sku];
-}
-function openPurchaseOrder(items = null) {
-  const selected =
-    items ||
-    lowStock.value.filter((item) =>
-      selectedReorderSkus.value.includes(item.sku),
-    );
-  if (!selected.length) return;
-  purchaseOrderItems.value = selected.map((item) => ({
-    sku: item.sku,
-    name: item.name,
-    supplier: item.supplier,
-    unit: item.unit,
-    currentStock: item.stock,
-    reorderPoint: item.reorderPoint,
-    quantity: Math.max(item.reorderPoint - item.stock, 1),
-    price: item.price,
-    unitCost: Math.round(getWeightedAverageCost(item)),
-  }));
-  showPurchaseOrderModal.value = true;
 }
 function openManualPurchasePicker() {
   manualPurchaseSearch.value = "";
@@ -372,48 +353,59 @@ function openManualPurchasePicker() {
   showManualPurchaseModal.value = true;
 }
 function toggleManualPurchaseSelection(sku) {
-  selectedManualPurchaseSkus.value = selectedManualPurchaseSkus.value.includes(
-    sku,
-  )
+  selectedManualPurchaseSkus.value = selectedManualPurchaseSkus.value.includes(sku)
     ? selectedManualPurchaseSkus.value.filter((item) => item !== sku)
     : [...selectedManualPurchaseSkus.value, sku];
 }
-function addManualPurchaseItems() {
+async function addManualPurchaseItems() {
   const selected = products.value.filter((item) =>
     selectedManualPurchaseSkus.value.includes(item.sku),
   );
-  showManualPurchaseModal.value = false;
-  openPurchaseOrder(selected);
+  if (!selected.length) return;
+  await createPurchaseOrder(selected);
 }
-function removePurchaseOrderItem(sku) {
-  purchaseOrderItems.value = purchaseOrderItems.value.filter(
-    (item) => item.sku !== sku,
-  );
-  selectedReorderSkus.value = selectedReorderSkus.value.filter(
-    (item) => item !== sku,
-  );
-}
-async function createPurchaseOrder() {
-  if (!purchaseOrderItems.value.length) return;
+async function createPurchaseOrder(items = null) {
+  if (isCreatingPurchaseOrder.value) return;
+  // Do not pass a native click event as "items" (the old button did this).
+  const selected = Array.isArray(items)
+    ? items
+    : lowStock.value.filter((item) => selectedReorderSkus.value.includes(item.sku));
+  if (!selected.length) {
+    notify("กรุณาเลือกสินค้าที่ต้องการสั่งซื้อก่อน", "ยังไม่มีสินค้า");
+    return;
+  }
   const order = {
-    id: `PO-${new Date()
-      .toISOString()
-      .replace(/[-:TZ.]/g, "")
-      .slice(0, 12)}`,
+    id: `PO-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
     createdAt: new Date().toISOString(),
     status: "รอดำเนินการ",
-    items: purchaseOrderItems.value.map((item) => ({
-      ...item,
-      quantity: Number(item.quantity) || 1,
-      unitCost: Number(item.unitCost) || 0,
-      priceAtOrder: Number(item.unitCost) || 0,
-    })),
+    items: selected.map((item) => {
+      const unitCost = Math.max(0, Number(getWeightedAverageCost(item)) || 0);
+      return {
+        sku: item.sku,
+        name: item.name,
+        supplier: item.supplier,
+        unit: item.unit,
+        currentStock: item.stock,
+        reorderPoint: item.reorderPoint,
+        quantity: Math.max(Number(item.reorderPoint) - Number(item.stock), 1),
+        price: item.price,
+        unitCost,
+        priceAtOrder: unitCost,
+      };
+    }),
   };
-  await operationsApi.create("purchaseOrders", order);
-  showPurchaseOrderModal.value = false;
-  selectedReorderSkus.value = [];
-  notify(`สร้างรายการสั่งซื้อ ${order.items.length} รายการแล้ว`);
-  router.push("/suppliers");
+  isCreatingPurchaseOrder.value = true;
+  try {
+    await operationsApi.create("purchaseOrders", order);
+    showManualPurchaseModal.value = false;
+    selectedReorderSkus.value = [];
+    selectedManualPurchaseSkus.value = [];
+    await router.push({ path: "/suppliers", hash: "#purchase-orders" });
+  } catch (error) {
+    notify(error.message || "กรุณาลองใหม่", "สร้างคำสั่งซื้อไม่สำเร็จ");
+  } finally {
+    isCreatingPurchaseOrder.value = false;
+  }
 }
 </script>
 
@@ -661,8 +653,8 @@ async function createPurchaseOrder() {
           <button
             class="button primary"
             type="button"
-            :disabled="!selectedReorderSkus.length"
-            @click="openPurchaseOrder"
+            :disabled="!selectedReorderSkus.length || isCreatingPurchaseOrder"
+            @click="createPurchaseOrder()"
           >
             <SvgIcon name="plus" />สร้างคำสั่งซื้อ<span
               v-if="selectedReorderSkus.length"
@@ -800,103 +792,6 @@ async function createPurchaseOrder() {
           <SvgIcon name="plus" />เพิ่มรายการ ({{
             selectedManualPurchaseSkus.length
           }})
-        </button>
-      </template>
-    </InventoryFormModal>
-    <InventoryFormModal
-      v-if="showPurchaseOrderModal"
-      eyebrow="PURCHASE ORDER"
-      title="รายการสั่งซื้อ"
-      description="ตรวจสอบและแก้ไขจำนวนที่ต้องการสั่ง ก่อนส่งรายการไปยังหน้าซัพพลายเออร์"
-      modal-class="purchase-order-modal"
-      @close="showPurchaseOrderModal = false"
-      @submit="createPurchaseOrder"
-    >
-      <div class="table-scroll purchase-order-table-wrap">
-        <table
-          v-if="purchaseOrderItems.length"
-          class="data-table purchase-order-table"
-        >
-          <thead>
-            <tr>
-              <th>สินค้า</th>
-              <th class="purchase-order-number-column">จำนวนสั่งซื้อ</th>
-              <th class="purchase-order-cost-column">ต้นทุน/หน่วย</th>
-              <th
-                class="purchase-order-action-column"
-                aria-label="ลบรายการ"
-              ></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in purchaseOrderItems" :key="item.sku">
-              <td>
-                <strong>{{ item.name }}</strong>
-                <small class="table-subtext"
-                  >{{ item.sku }} · {{ item.supplier }}</small
-                >
-              </td>
-              <td class="purchase-order-number-column">
-                <input
-                  v-model.number="item.quantity"
-                  type="number"
-                  min="1"
-                  step="1"
-                  :aria-label="`จำนวนสั่งซื้อ ${item.name}`"
-                />
-              </td>
-              <td class="purchase-order-cost-column">
-                <input
-                  v-model.number="item.unitCost"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  :aria-label="`ต้นทุนต่อหน่วย ${item.name}`"
-                />
-                <small
-                  v-if="item.unitCost > item.price"
-                  class="purchase-cost-warning"
-                  >สูงกว่าต้นทุนเดิม ฿{{
-                    Number(item.price).toLocaleString("th-TH")
-                  }}</small
-                >
-              </td>
-              <td class="purchase-order-action-column">
-                <button
-                  type="button"
-                  class="icon-button purchase-order-remove"
-                  title="ลบรายการ"
-                  :aria-label="`ลบ ${item.name}`"
-                  @click="removePurchaseOrderItem(item.sku)"
-                >
-                  <SvgIcon name="close" size="16" />
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-else class="empty-state">ไม่มีรายการที่เลือก</p>
-      </div>
-      <template #footer-pagination>
-        <TablePagination
-          :total="purchaseOrderItems.length"
-          label="รายการสินค้า"
-        />
-      </template>
-      <template #actions>
-        <button
-          type="button"
-          class="button secondary"
-          @click="showPurchaseOrderModal = false"
-        >
-          กลับไปแก้ไข
-        </button>
-        <button
-          type="submit"
-          class="button primary"
-          :disabled="!purchaseOrderItems.length"
-        >
-          สร้างรายการสั่งซื้อ
         </button>
       </template>
     </InventoryFormModal>
