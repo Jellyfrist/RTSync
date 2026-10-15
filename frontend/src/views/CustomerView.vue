@@ -52,7 +52,7 @@ onMounted(async () => {
     quoteProducts.value = products.map((item) => ({
       sku: item.sku,
       name: item.name,
-      price: item.price,
+      price: Number(item.salePrice ?? item.price ?? 0),
       unit: item.unit,
     }));
     salesHistory.value = sales;
