@@ -39,7 +39,7 @@ export const operationsApi = {
   // ดึงใบงานบริการ
   getServiceTickets: async () => {
     try {
-      return await request("/operations/service-tickets");
+      return await request("/operations/serviceTickets");
     } catch (error) {
       if (!isMockEnabled()) throw error;
       return mockDb.get("serviceTickets");
