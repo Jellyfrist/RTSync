@@ -134,6 +134,7 @@ const filteredQuoteProducts = computed(() => {
 });
 const salesOrders = ref([]);
 const quotations = ref([]);
+const customerRecords = ref([]);
 const quotationLoadError = ref("");
 const salesSearch = ref("");
 const paymentStatusFilter = ref("ทั้งหมด");
@@ -267,7 +268,10 @@ onMounted(async () => {
         operationsApi.getAppointments(),
         operationsApi.getServiceTickets(),
         operationsApi.getSales(),
-        operationsApi.getQuotations(),
+        operationsApi.getQuotations().catch((error) => {
+          quotationLoadError.value = error.message || "ไม่สามารถโหลดใบเสนอราคาได้";
+          return [];
+        }),
         peopleApi.getCustomers(),
       ]);
     catalog.value.splice(0, catalog.value.length, ...catalogRecords);
@@ -275,6 +279,7 @@ onMounted(async () => {
     serviceTickets.value = ticketRecords;
     salesOrders.value = salesRecords;
     quotations.value = quoteRecords;
+    customerRecords.value = customerRecords;
     customerOptions.value = customerRecords.map((item) => item.name).filter(Boolean);
     if (!customerOptions.value.includes(quotationForm.value.customer))
       quotationForm.value.customer = customerOptions.value[0] || "";
@@ -433,9 +438,7 @@ async function saveQuotation() {
     return notify("กรุณาเพิ่มสินค้า หรือค่าบริการอย่างน้อย 1 รายการ");
   if (lossMakingItems.value.length)
     return notify("ไม่สามารถออกใบเสนอราคาที่ราคาต่ำกว่าต้นทุนได้");
-  const customer = mockDb
-    .get("customers")
-    .find((item) => item.name === quotationForm.value.customer);
+  const customer = customerRecords.value.find((item) => item.name === quotationForm.value.customer);
   const customerCode = customer?.code || "";
   const quotation = {
     id: quotationForm.value.quoteId,
