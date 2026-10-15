@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.config import settings
+from app.authorization import role_for_email
 
 router = APIRouter(prefix="/auth", tags=["authentication"], include_in_schema=False)
 
@@ -43,11 +44,14 @@ def _secure_cookies():
 
 def _is_allowed(user):
     email = (user.get("email") or "").strip().casefold()
-    allowed = {item.strip().casefold() for item in settings.rtsync_allowed_emails.split(",") if item.strip()}
+    role = role_for_email(
+        email, owner_emails=settings.rtsync_owner_emails,
+        employee_emails=settings.rtsync_employee_emails,
+    )
     providers = user.get("app_metadata", {}).get("providers", [])
     if not providers:
         providers = [user.get("app_metadata", {}).get("provider")]
-    return bool(email and user.get("email_confirmed_at") and email in allowed and "google" in providers)
+    return bool(email and user.get("email_confirmed_at") and role and "google" in providers)
 
 
 async def authorized_user(token):
@@ -64,7 +68,17 @@ async def authorized_user(token):
     user = response.json()
     if not _is_allowed(user):
         raise HTTPException(status_code=403, detail="บัญชี Google นี้ยังไม่ได้รับอนุญาตให้ใช้ RTSync")
-    return {"id": user.get("id"), "name": user.get("user_metadata", {}).get("full_name") or user.get("email"), "email": user.get("email")}
+    role = role_for_email(
+        user.get("email") or "",
+        owner_emails=settings.rtsync_owner_emails,
+        employee_emails=settings.rtsync_employee_emails,
+    )
+    return {
+        "id": user.get("id"),
+        "name": user.get("user_metadata", {}).get("full_name") or user.get("email"),
+        "email": user.get("email"),
+        "role": role,
+    }
 
 
 def _login_redirect(error):
@@ -73,7 +87,7 @@ def _login_redirect(error):
 
 @router.get("/google")
 async def login_google():
-    if not _enabled() or not settings.supabase_auth_key or not settings.rtsync_allowed_emails.strip():
+    if not _enabled() or not settings.supabase_auth_key or not (settings.rtsync_owner_emails.strip() or settings.rtsync_employee_emails.strip()):
         raise HTTPException(status_code=503, detail="Google Login ยังไม่ได้เปิดใช้งาน")
     verifier = secrets.token_urlsafe(48)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
