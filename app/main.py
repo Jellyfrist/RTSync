@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.auth import router as auth_router, authorized_user, SESSION_COOKIE
+from app.authorization import can_access_api
 
 from app.config import Settings, settings
 from app.controllers import catalog, compat, customers, employees, health, procurement, suppliers
@@ -33,27 +34,42 @@ def create_app(config: Settings | None = None) -> FastAPI:
     if config.rtsync_auth_required:
         @application.middleware("http")
         async def enforce_google_auth(request: Request, call_next):
-            # The callback/login and health check must be reachable without a session.
-            # Documentation and all data routes remain protected.
+            """Check Google session + chapter-10 role before running business APIs."""
             path = request.url.path
-            public_routes = {
-                f"{config.api_prefix}/health",
-                f"{config.api_prefix}/auth/google",
-                f"{config.api_prefix}/auth/callback",
-                f"{config.api_prefix}/auth/me",
-                f"{config.api_prefix}/auth/logout",
+            prefix = config.api_prefix.rstrip("/")
+            public_gets = {
+                f"{prefix}/health",
+                f"{prefix}/auth/status",
+                f"{prefix}/auth/google",
+                f"{prefix}/auth/callback",
+                f"{prefix}/auth/me",
             }
-            if request.method == "OPTIONS" or (request.method == "GET" and path in public_routes) or (path == f"{config.api_prefix}/auth/logout" and request.method == "POST"):
+            if request.method == "OPTIONS":
                 return await call_next(request)
+            if request.method == "GET" and path in public_gets:
+                return await call_next(request)
+            if request.method == "POST" and path == f"{prefix}/auth/logout":
+                return await call_next(request)
+
             try:
-                await authorized_user(request.cookies.get(SESSION_COOKIE))
-            except Exception as exc:
-                # Keep HTTPException detail/status; do not expose internal data.
-                from fastapi import HTTPException
-                if isinstance(exc, HTTPException):
-                    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers={"Cache-Control": "no-store"})
-                raise
+                user = await authorized_user(request.cookies.get(SESSION_COOKIE))
+            except HTTPException as exc:
+                return JSONResponse(
+                    {"detail": exc.detail},
+                    status_code=exc.status_code,
+                    headers={"Cache-Control": "no-store"},
+                )
+
+            if not can_access_api(
+                user["role"], request.method, path, prefix
+            ):
+                return JSONResponse(
+                    {"detail": "บัญชีนี้ไม่มีสิทธิ์เข้าถึงฟังก์ชันดังกล่าว"},
+                    status_code=403,
+                    headers={"Cache-Control": "no-store"},
+                )
             return await call_next(request)
+
     return application
 
 
