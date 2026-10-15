@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # Opt-in Google login; Vercel Authentication stays enabled until activated.
     rtsync_auth_required: bool = False
     rtsync_allowed_emails: str = ""
+    # Email-based, server-side RBAC; never trust a role sent by the browser.
+    rtsync_owner_emails: str = ""
+    rtsync_employee_emails: str = ""
     supabase_auth_url: str = "https://zbgomqxlqmcucekjccmt.supabase.co"
     # Server-only publishable API key. Never prefix with VITE_: public REST grants are not hardened.
     supabase_auth_key: str = ""
