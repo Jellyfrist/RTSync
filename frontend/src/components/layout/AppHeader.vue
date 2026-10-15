@@ -9,7 +9,7 @@ const router = useRouter();
 const userMenuOpen = ref(false);
 const currentUser = computed(() => ({
   name: authEnabled.value ? (sessionUser.value?.name || "RTSync User") : "RTSync",
-  username: authEnabled.value ? (sessionUser.value?.email || "") : "Vercel protected",
+  username: authEnabled.value ? (sessionUser.value?.username || "") : "Vercel protected",
   role: authEnabled.value
     ? (sessionUser.value?.role === "owner" ? "เจ้าของร้าน" : "พนักงาน")
     : "Restricted Access",
