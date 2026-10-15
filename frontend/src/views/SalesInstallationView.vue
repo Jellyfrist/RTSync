@@ -9,6 +9,7 @@ import SvgIcon from "@/components/SvgIcon.vue";
 import TablePagination from "@/components/TablePagination.vue";
 import OperationsCalendar from "@/components/OperationsCalendar.vue";
 import { operationsApi } from "@/api/operationsApi";
+import { peopleApi } from "@/api/peopleApi";
 import { mockDb } from "@/api/mockDb";
 import { pricingDecision } from "@/api/pricingPolicy";
 
@@ -100,9 +101,10 @@ const customAppointmentTime = ref("");
 // สินค้าแนะนำที่โหลดจาก API งานปฏิบัติการ
 const catalog = ref([]);
 const bill = ref([]);
+const newQuotationId = () => `QT-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 const quotationForm = ref({
   customer: defaultCustomer,
-  quoteId: "QT-25061",
+  quoteId: newQuotationId(),
   issuedAt: new Date().toISOString().slice(0, 10),
   validUntil: "",
   notes: "",
@@ -131,6 +133,8 @@ const filteredQuoteProducts = computed(() => {
   );
 });
 const salesOrders = ref([]);
+const quotations = ref([]);
+const quotationLoadError = ref("");
 const salesSearch = ref("");
 const paymentStatusFilter = ref("ทั้งหมด");
 const orderStatusFilter = ref("ทั้งหมด");
@@ -254,19 +258,31 @@ const editForm = ref({
 });
 const customEditTime = ref("");
 onMounted(async () => {
-  // โหลดสินค้า นัดหมาย และใบงานพร้อมกันเมื่อเปิดหน้า
-  const [catalogRecords, appointmentRecords, ticketRecords, salesRecords] =
-    await Promise.all([
-      operationsApi.getCatalog(),
-      operationsApi.getAppointments(),
-      operationsApi.getServiceTickets(),
-      operationsApi.getSales(),
-    ]);
-  catalog.value.splice(0, catalog.value.length, ...catalogRecords);
-  appointments.value = appointmentRecords;
-  serviceTickets.value = ticketRecords;
-  salesOrders.value = salesRecords;
+  // The real inventory products populate quotation options. Previously an
+  // empty operations/catalog collection caused the quotation picker to be blank.
+  try {
+    const [catalogRecords, appointmentRecords, ticketRecords, salesRecords, quoteRecords, customerRecords] =
+      await Promise.all([
+        operationsApi.getCatalog(),
+        operationsApi.getAppointments(),
+        operationsApi.getServiceTickets(),
+        operationsApi.getSales(),
+        operationsApi.getQuotations(),
+        peopleApi.getCustomers(),
+      ]);
+    catalog.value.splice(0, catalog.value.length, ...catalogRecords);
+    appointments.value = appointmentRecords;
+    serviceTickets.value = ticketRecords;
+    salesOrders.value = salesRecords;
+    quotations.value = quoteRecords;
+    customerOptions.value = customerRecords.map((item) => item.name).filter(Boolean);
+    if (!customerOptions.value.includes(quotationForm.value.customer))
+      quotationForm.value.customer = customerOptions.value[0] || "";
+  } catch (error) {
+    quotationLoadError.value = error.message || "ไม่สามารถดึงข้อมูลใบเสนอราคาได้";
+  }
 });
+
 const total = computed(() =>
   [...bill.value, ...quoteServices.value].reduce(
     (sum, item) => sum + item.price * item.qty,
@@ -320,6 +336,7 @@ function openServiceForm(date = "") {
   showServiceForm.value = true;
 }
 function openQuotationForm() {
+  quotationForm.value.quoteId = newQuotationId();
   customerSearch.value = "";
   selectedQuoteSearch.value = "";
   showQuotationForm.value = true;
@@ -449,7 +466,8 @@ async function saveQuotation() {
     total: total.value,
     status: "ร่างใบเสนอราคา",
   };
-  await operationsApi.create("quotations", quotation);
+  const savedQuote = await operationsApi.create("quotations", quotation);
+  quotations.value.unshift(savedQuote);
   const sale = {
     ...quotation,
     paymentStatus: "รอชำระมัดจำ",
@@ -733,6 +751,35 @@ async function createAppointment() {
         <span>{{ serviceTickets.length }}</span>
       </button>
     </nav>
+    <section v-if="activeTab === 'sales'" class="operations-table-section">
+      <div class="task-table-heading">
+        <div>
+          <h2 class="section-heading">ใบเสนอราคาที่บันทึกไว้</h2>
+          <p class="section-caption">ข้อมูลใบเสนอราคาจาก Backend (Supabase) ไม่ใช่ข้อมูลตัวอย่าง</p>
+        </div>
+      </div>
+      <p v-if="quotationLoadError" role="alert" class="empty-state">{{ quotationLoadError }}</p>
+      <div class="table-scroll">
+        <table class="data-table operations-table">
+          <thead>
+            <tr><th>เลขที่ใบเสนอราคา</th><th>ลูกค้า</th><th>วันที่ออก</th><th>ยอดรวม</th><th>สถานะ</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="quote in quotations" :key="quote.id">
+              <td><span class="sku-code">{{ quote.id }}</span></td>
+              <td>{{ quote.customer || "—" }}</td>
+              <td>{{ quote.issuedAt ? new Date(quote.issuedAt).toLocaleDateString("th-TH") : "—" }}</td>
+              <td class="mono">฿{{ formatCurrency(Number(quote.total) || 0) }}</td>
+              <td>{{ quote.status || "—" }}</td>
+            </tr>
+            <tr v-if="!quotations.length">
+              <td colspan="5" class="empty-state">ยังไม่มีใบเสนอราคาที่บันทึกในฐานข้อมูล</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <TablePagination :total="quotations.length" label="ใบเสนอราคา" />
+    </section>
     <section
       v-if="activeTab === 'sales'"
       class="operations-table-section sales-orders-section"
