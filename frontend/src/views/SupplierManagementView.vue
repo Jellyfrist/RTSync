@@ -320,7 +320,7 @@ async function completePurchaseOrder(order) {
         <div class="task-overview-grid supplier-overview-grid">
           <div>
             <span>ซัพพลายเออร์ทั้งหมด</span
-            ><strong>{{ suppliers.length }} <small>ราย</small></strong
+            ><strong>{{ canonicalSuppliers.length }} <small>ราย</small></strong
             ><small>พร้อมใช้กับการจัดซื้อ</small>
           </div>
           <div>
