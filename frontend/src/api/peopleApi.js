@@ -11,6 +11,7 @@ const normalizeEmployee = (employee) => ({
   otHours: employee.otHours ?? employee.overtime_hours,
   otRate: employee.otRate ?? employee.overtime_rate,
   startDate: employee.startDate ?? employee.start_date,
+  salary: Number(employee.salary ?? 0),
   allowance: Number(employee.allowance ?? 0),
   deduction: Number(employee.deduction ?? 0),
 });
