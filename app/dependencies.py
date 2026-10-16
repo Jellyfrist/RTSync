@@ -17,6 +17,7 @@ from app.repositories.catalog_repository import CatalogRepository
 from app.repositories.customer_repository import CustomerRepository
 from app.repositories.employee_repository import EmployeeRepository
 from app.repositories.supplier_repository import SupplierRepository
+from app.scripts.migrate_employee_phone import migrate as migrate_employee_phone
 from app.services.catalog_service import CatalogService
 from app.services.directory_service import DirectoryService
 
@@ -47,7 +48,13 @@ def get_supplier_repository(session: SessionDependency) -> ReadRepository[Suppli
     return SupplierRepository(session)
 
 
+@lru_cache(maxsize=1)
+def ensure_employee_phone_schema() -> None:
+    migrate_employee_phone(get_database())
+
+
 def get_employee_repository(session: SessionDependency) -> ReadRepository[Employee]:
+    ensure_employee_phone_schema()
     return EmployeeRepository(session)
 
 

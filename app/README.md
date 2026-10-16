@@ -44,7 +44,7 @@ The procurement, inventory and outbound stock issue screens use the API. Custome
 
 `init_db` creates missing tables and applies the inventory upgrade to existing PostgreSQL tables. It adds product units and reorder points, supplier-product links, outbound stock issue tables, and changes price and salary columns to `NUMERIC(14,2)`. Back up existing data before running it on a shared database. It does not cover future schema changes; use versioned migrations for those.
 
-For an existing database, run `python -m app.scripts.migrate_employee_phone` once before deploying the employee phone-field change. This migration only adds `employees.phone` with an empty-string default and preserves existing payroll records.
+For an existing database, the employee API applies the additive `employees.phone` migration on its first request. To apply it manually before deployment, run `python -m app.scripts.migrate_employee_phone`. Existing employee records are preserved and receive an empty-string default.
 
 ## Tests
 
