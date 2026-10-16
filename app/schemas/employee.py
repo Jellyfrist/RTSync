@@ -10,6 +10,7 @@ class Employee(ResponseModel):
     id: str
     name: str
     role: str
+    phone: str = ""
     salary: Decimal
     overtime_hours: float
     email: str = ""
@@ -22,6 +23,7 @@ class Employee(ResponseModel):
 class EmployeeInput(BaseModel):
     name: str
     role: str
+    phone: str = ""
     salary: Decimal = 0
     overtime_hours: float = 0
     email: str = ""

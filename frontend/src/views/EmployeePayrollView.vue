@@ -128,7 +128,6 @@ function openEdit(employee = activeEmployee.value) {
   showModal.value = true;
 }
 async function saveEmployee() {
-  // บันทึกข้อมูลพนักงานใน state ของหน้าจอ
   if (!form.value.name.trim() || !form.value.role.trim()) return;
   const values = {
     ...form.value,
@@ -136,18 +135,22 @@ async function saveEmployee() {
     allowance: Number(form.value.allowance),
     deduction: Number(form.value.deduction),
   };
-  const saved = editingEmployee.value
-    ? await peopleApi.updateEmployee(editingEmployee.value.id, values)
-    : await peopleApi.createEmployee(values);
-  if (editingEmployee.value) Object.assign(editingEmployee.value, saved);
-  else {
-    employees.value.push({ ...saved, initials: saved.name.slice(0, 2) });
-    activeId.value = saved.id;
+  try {
+    const saved = editingEmployee.value
+      ? await peopleApi.updateEmployee(editingEmployee.value.id, values)
+      : await peopleApi.createEmployee(values);
+    if (editingEmployee.value) Object.assign(editingEmployee.value, saved);
+    else {
+      employees.value.push({ ...saved, initials: saved.name.slice(0, 2) });
+      activeId.value = saved.id;
+    }
+    showModal.value = false;
+    notify(
+      editingEmployee.value ? "บันทึกข้อมูลพนักงานแล้ว" : "เพิ่มพนักงานใหม่แล้ว",
+    );
+  } catch (error) {
+    notify(error?.message || "บันทึกข้อมูลพนักงานไม่สำเร็จ");
   }
-  showModal.value = false;
-  notify(
-    editingEmployee.value ? "บันทึกข้อมูลพนักงานแล้ว" : "เพิ่มพนักงานใหม่แล้ว",
-  );
 }
 function calculatePayroll() {
   notify(

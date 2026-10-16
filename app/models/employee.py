@@ -16,3 +16,4 @@ class Employee:
     overtime_rate: Decimal = Decimal("0")
     allowance: Decimal = Decimal("0")
     deduction: Decimal = Decimal("0")
+    phone: str = ""

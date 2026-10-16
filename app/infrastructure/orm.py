@@ -85,6 +85,7 @@ class EmployeeRecord(BaseModel):
     salary: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     overtime_hours: Mapped[float] = mapped_column(Float, nullable=False, default=0)
     email: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    phone: Mapped[str] = mapped_column(String(64), nullable=False, default="")
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     overtime_rate: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)
     allowance: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False, default=0)

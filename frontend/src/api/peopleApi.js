@@ -6,6 +6,7 @@ import { normalizeSupplierName } from "@/utils/suppliers";
 // ข้อมูลตัวอย่างสำหรับ preview UI กรณีเปิดเฉพาะ frontend โดยยังไม่ได้รัน API
 const normalizeEmployee = (employee) => ({
   ...employee,
+  phone: employee.phone ?? "",
   initials: employee.initials || employee.name.slice(0, 2),
   otHours: employee.otHours ?? employee.overtime_hours,
   otRate: employee.otRate ?? employee.overtime_rate,
@@ -153,8 +154,18 @@ export const peopleApi = {
     request(`/suppliers/${encodeURIComponent(supplierId)}/products/${encodeURIComponent(sku)}`, { method: "POST" }),
   unlinkProduct: (supplierId, sku) =>
     request(`/suppliers/${encodeURIComponent(supplierId)}/products/${encodeURIComponent(sku)}`, { method: "DELETE" }),
-  createEmployee: (employee) =>
-    request("/employees", { method: "POST", body: JSON.stringify(employeePayload(employee)) }),
-  updateEmployee: (id, employee) =>
-    request(`/employees/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(employeePayload(employee)) }),
+  createEmployee: async (employee) =>
+    normalizeEmployee(
+      await request("/employees", {
+        method: "POST",
+        body: JSON.stringify(employeePayload(employee)),
+      }),
+    ),
+  updateEmployee: async (id, employee) =>
+    normalizeEmployee(
+      await request(`/employees/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        body: JSON.stringify(employeePayload(employee)),
+      }),
+    ),
 };
